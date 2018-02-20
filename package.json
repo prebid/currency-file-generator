@@ -1,0 +1,22 @@
+{
+  "name": "currency-file-generator",
+  "version": "0.0.1",
+  "description": "This code is used to generate the file that is published to http://currency.prebid.org/latest.json.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prebid/currency-file-generator.git"
+  },
+  "author": "Rubicon Project",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/prebid/currency-file-generator/issues"
+  },
+  "homepage": "https://github.com/prebid/currency-file-generator#readme"
+}
