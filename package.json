@@ -1,11 +1,7 @@
 {
   "name": "currency-file-generator",
   "version": "0.0.1",
-  "description": "This code is used to generate the file that is published to http://currency.prebid.org/latest.json.",
-  "main": "index.js",
-  "directories": {
-    "test": "__tests__"
-  },
+  "description": "Loads currency rates from api.fixer.io and creates a JSON representation in S3.",
   "scripts": {
     "test": "jest \"__tests__/[a-zA-Z_0-9\\-\\.]{1,}spec\\.js$\""
   },
@@ -13,15 +9,13 @@
     "type": "git",
     "url": "git+https://github.com/prebid/currency-file-generator.git"
   },
-  "author": "Rubicon Project",
+  "author": "",
   "license": "UNLICENSED",
-  "bugs": {
-    "url": "https://github.com/prebid/currency-file-generator/issues"
+  "engines": {
+    "node": ">=6.1.0"
   },
-  "homepage": "https://github.com/prebid/currency-file-generator#readme",
   "dependencies": {
-    "aws-sdk": "^2.198.0",
-    "jest-cli": "^22.4.0"
+    "aws-sdk": "^2.198.0"
   },
   "devDependencies": {
     "jest": "^22.4.0"
