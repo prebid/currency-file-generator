@@ -77,11 +77,19 @@ exports.handler = function(event, context) {
  * @return {S3UploadParams}
  */
 function createDocumentParams(bucket, filename, documentObj, expires) {
-    return {
-        Bucket: bucket,
-        Key: filename,
-        Body: JSON.stringify(documentObj),
-        Expires: expires
+    if (typeof bucket === 'string' && bucket !== '' &&
+        typeof filename === 'string' && filename !== '' &&
+        documentObj !== null && typeof documentObj === 'object' && !Array.isArray(documentObj) && Object.keys(documentObj).length > 0 &&
+        expires instanceof Date) {
+        return {
+            Bucket: bucket,
+            Key: filename,
+            Body: JSON.stringify(documentObj),
+            Expires: expires
+        }
+    }
+    else {
+        return undefined;
     }
 }
 
@@ -119,7 +127,9 @@ function requestCurrencyFile(url, fileEndCallback) {
         let body = '';
 
         // the 'data' event is emitted whenever the stream is relinquishing ownership of a chunk of data to the consumer
-        res.on('data', (chunk) => { body += chunk; });
+        res.on('data', (chunk) => {
+            body += chunk;
+        });
 
         // the 'error' event emits if the stream is unable to generate data due to internal failure or from an invalid chunk of data
         res.on('error', (e) => {
@@ -161,10 +171,10 @@ function uploadDocumentToS3(params, context) {
 
         if (e) {
             logError(e.toString(), e.stack);
-            fileProps = { filename: params.Key, error: data };
+            fileProps = {filename: params.Key, error: data};
         } else {
             log('rates pushed to s3: ' + params.Bucket + ' ' + params.Key);
-            fileProps = { filename: params.Key, error: data };
+            fileProps = {filename: params.Key, error: data};
         }
 
         context.done(null, JSON.stringify(fileProps));
@@ -194,7 +204,7 @@ function createDocument(results) {
 /**
  * @param {string} line
  */
-function log (line) {
+function log(line) {
     if (debug) console.log(line);
 }
 
@@ -202,7 +212,7 @@ function log (line) {
  * @param {string} line
  * @param {string|Error|Object} error
  */
-function logError (line, error) {
+function logError(line, error) {
     console.error(line, error);
 }
 

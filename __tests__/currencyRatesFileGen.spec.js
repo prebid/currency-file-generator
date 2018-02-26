@@ -89,5 +89,24 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             Body: docAsString,
             Expires: expires
         });
+
+        expect(spec.createDocumentParams(undefined, undefined, undefined, undefined)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', undefined, undefined, undefined)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', 'file1', undefined, undefined)).toBeUndefined();
+
+        expect(spec.createDocumentParams('', '', '', '')).toBeUndefined();
+        expect(spec.createDocumentParams('', 'file1', doc, expires)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', '', doc, expires)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', 'file1', doc, expires)).toBeUndefined();
+
+        expect(spec.createDocumentParams(234, 'file1', doc, expires)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', 2230, doc, expires)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', 2230, doc, expires)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', 'file1', 233, expires)).toBeUndefined();
+
+        expect(spec.createDocumentParams('bucket1', 'file1', doc, undefined)).toBeUndefined();
+        expect(spec.createDocumentParams('bucket1', 'file1', doc, '32432')).toBeUndefined();
+
+        expect(spec.createDocumentParams('bucket1', 'file1', {}, expires)).toBeUndefined();
     });
 });
