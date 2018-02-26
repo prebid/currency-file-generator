@@ -1,6 +1,16 @@
 const {http} = require('../__mocks__/http.mock');
 const spec = require('../src/currencyRatesFileGen').spec;
 
+// Helper Constants
+const SECONDS_IN_MINUTE = 60;
+const SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE;
+const SECONDS_IN_DAY = SECONDS_IN_HOUR * 24;
+// Mon Jan 01 2018 12:30:40 GMT-0800 (PST)
+const TIME_IN_MS_JAN_1_2018 = 1514838640000;
+
+
+
+
 describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful operations`, () => {
     beforeAll(() => {
         http.reset();
@@ -44,8 +54,27 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
     });
 
     test('getExpiration', () => {
-        const expiration = spec.getExpiration(365);
-        console.log('expiration:', expiration);
+        // Mock Date.prototype.getTime used by getExpiration method
+        const dateGetTimeSpy = jest.spyOn(global.Date.prototype, 'getTime').mockImplementation(() => {
+            return TIME_IN_MS_JAN_1_2018;
+        });
+
+        // Result is current time + expiration argument time
+        const expirationOneHour = spec.getExpiration(SECONDS_IN_HOUR);
+        const expirationOneDay = spec.getExpiration(SECONDS_IN_DAY);
+        const expirationOneMonth = spec.getExpiration(SECONDS_IN_DAY * 31);
+
+        expect(spec.getExpiration(NaN)).toBeUndefined();
+        expect(spec.getExpiration('2309')).toBeUndefined();
+        expect(spec.getExpiration(null)).toBeUndefined();
+        expect(spec.getExpiration(undefined)).toBeUndefined();
+
+        // Disable getTime mocking so it can be used below
+        dateGetTimeSpy.mockRestore();
+
+        expect(expirationOneHour.getTime()).toEqual(1514842240000);
+        expect(expirationOneDay.getTime()).toEqual(1514925040000);
+        expect(expirationOneMonth.getTime()).toEqual(1517517040000);
     });
 
     test('createDocumentParams', () => {

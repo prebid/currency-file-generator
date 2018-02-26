@@ -59,10 +59,11 @@ exports.handler = function(event, context) {
         const currencyFileRequest = requestCurrencyFile(currencyUrl, (json) => {
             results.push(json);
             countCompleted++;
-
             if (countCompleted === fromCurrencies.length) {
-                const docParams = createDocumentParams(bucket, filename, createDocument(results));
-                uploadDocumentToS3(docParams, context);
+                const docParams = createDocumentParams(bucket, filename, createDocument(results), getExpiration(expires));
+                if (typeof docParams === 'object') {
+                    uploadDocumentToS3(docParams, context);
+                }
             }
         });
     }
@@ -89,7 +90,12 @@ function createDocumentParams(bucket, filename, documentObj, expires) {
  * @return {Date}
  */
 function getExpiration(expires) {
-    return new Date(new Date().getTime() + expires * 1000);
+    if (typeof expires === 'number' && !isNaN(expires)) {
+        return new Date(new Date().getTime() + expires * 1000);
+    }
+    else {
+        return undefined;
+    }
 }
 
 /**
