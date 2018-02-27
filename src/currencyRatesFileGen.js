@@ -51,26 +51,33 @@ exports.handler = function(event, context) {
          */
         const currencyUrl = constructCurrencyUrl(fromCurrency, supportedCurrencies);
         if (!currencyUrl) {
+            // currencyUrl error, abort
             return;
         }
 
         requestCurrencyFile(currencyUrl, (json) => {
-            // if there was an error requesting currency file, json will be 'undefined'
-            if (typeof json !== 'undefined') {
+            if (json !== null && typeof json === 'object') {
                 results.push(json);
             }
+            else {
+                // json undefined, abort
+                return;
+            }
 
-            if (results.length && fromCurrencies.length) {
+            if (results.length === fromCurrencies.length) {
                 const expiration = getExpiration(expires);
+                if (!expiration) {
+                    // expiration error, abort
+                    return;
+                }
 
                 const docParams = createDocumentParams(bucket, filename, createDocument(results), expiration);
+                if (!docParams) {
+                    // documentParams error, abort
+                    return;
+                }
 
-                if (docParams !== null && typeof docParams === 'object') {
-                    uploadDocumentToS3(docParams, context);
-                }
-                else {
-                    logError('Error uploadDocumentToS3 was not executed because docParams is undefined');
-                }
+                uploadDocumentToS3(docParams, context);
             }
         });
     }
