@@ -1,37 +1,40 @@
 /**
- * Loads currency rates from api.fixer.io and creates a JSON representation in S3.
+ * Loads currency rates from api.fixer.io and creates and uploads a JSON representation to S3.
  * @fileOverview prebidCurrencyRatesFileGenerator
  * @author Rubicon Project
  * @version 1.0.1
  */
-
 const http = require('http');
 const aws = require('aws-sdk');
 
 const fromCurrencies = ['USD', 'GBP'];
 const supportedCurrencies = 'AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR';
 
-const bucket = 'currency.prebid.org';
-const filename = 'latest.json';
-const expires = 24 * 3600 + 5; // when to expire for HTTP "Expires:" header (seconds)
-
-const currencyAlertsEmail = 'alerts@prebid.org';
-
-const debug = true;
+// when to expire for HTTP "Expires:" header (seconds)
+const expires = 24 * 3600 + 5;
 
 /**
- * @typedef {Object} S3UploadParams
- * @property {string} Bucket - Name of the bucket to which the PUT operation was initiated.
- * @property {string} Key - Object key for which the PUT operation was initiated.
- * @property {Buffer|Array|Blob|String|ReadableStream} Body - Object data
- * @property {Date} Expires - The date and time at which the object is no longer cacheable.
+ * @returns {boolean} returns env variable value if set or default
  */
+function getDebug() {
+    return (typeof process.env.DEBUG !== 'undefined') ? (process.env.DEBUG === '1') : true;
+}
 
 /**
- * @typedef {Object} FileProps
- * @property {string} filename
- * @property {ManagedUpload.SendData|undefined} error
+ * returns env variable value if set or default
+ * @returns {string}
  */
+function getBucket() {
+    return process.env.S3_BUCKET || 'currency.prebid.org';
+}
+
+/**
+ * returns env variable value if set or default
+ * @returns {string}
+ */
+function getFilename() {
+    return process.env.S3_FILENAME || 'latest.json';
+}
 
 /**
  * The function AWS Lambda calls to start execution of your Lambda function.
@@ -39,10 +42,8 @@ const debug = true;
  * @param event - AWS Lambda uses this parameter to pass in event data to the handler.
  * @param context - the context parameter contains functions to access runtime information
  */
-function handler(event, context) {
-    /**
-     * @type {Array.<Object>}
-     */
+exports.handler = function(event, context) {
+    /** @type {Array.<Object>} - loaded and parsed json objects for currency */
     const results = [];
     console.log('fromCurrencies', fromCurrencies);
 
@@ -52,7 +53,8 @@ function handler(event, context) {
          */
         const currencyUrl = constructCurrencyUrl(fromCurrency, supportedCurrencies);
         if (!currencyUrl) {
-            // currencyUrl error, abort
+            logError('Error: malformed currencyUrl', currencyUrl);
+            // no currencyUrl, exit
             return;
         }
 
@@ -61,7 +63,8 @@ function handler(event, context) {
                 results.push(json);
             }
             else {
-                // json undefined, abort
+                logError('Error: malformed json:', json);
+                // json undefined, exit
                 return;
             }
 
@@ -69,13 +72,15 @@ function handler(event, context) {
             if (results.length === fromCurrencies.length) {
                 const expiration = getExpiration(expires);
                 if (!expiration) {
-                    // expiration error, abort
+                    logError('Error: malformed expiration date:', expiration);
+                    // expiration error, exit
                     return;
                 }
 
-                const docParams = createDocumentParams(bucket, filename, createDocument(results), expiration);
+                const docParams = createDocumentParams(getBucket(), getFilename(), createDocument(results), expiration);
                 if (!docParams) {
-                    // documentParams error, abort
+                    logError('Error: malformed docParams:', docParams);
+                    // documentParams error, exit
                     return;
                 }
 
@@ -83,8 +88,7 @@ function handler(event, context) {
             }
         });
     }
-}
-exports.handler = handler;
+};
 
 /**
  * @param {string} bucket
@@ -116,7 +120,6 @@ function getExpiration(expires) {
     if (typeof expires === 'number' && !isNaN(expires)) {
         return new Date(new Date().getTime() + expires * 1000);
     }
-    logError('Error: Invalid \"expiration\" value:', expires + ' ' + Object.prototype.toString.call(expires));
     return undefined;
 }
 
@@ -127,11 +130,11 @@ function getExpiration(expires) {
  */
 function constructCurrencyUrl(fromCurrency, supportedCurrencies) {
     if (typeof fromCurrency !== 'string' || fromCurrency === '') {
-        logError('Error: currencyUrl, has invalid \"fromCurrency\"', fromCurrency + ' ' + Object.prototype.toString.call(fromCurrency));
+        logError('Error: invalid fromCurrency', fromCurrency + ' ' + Object.prototype.toString.call(fromCurrency));
         return undefined;
     }
     if (typeof supportedCurrencies !== 'string' || supportedCurrencies === '') {
-        logError('Error: currencyUrl, has invalid \"supportedCurrencies\"', supportedCurrencies + ' ' + Object.prototype.toString.call(supportedCurrencies));
+        logError('Error: invalid supportedCurrencies', supportedCurrencies + ' ' + Object.prototype.toString.call(supportedCurrencies));
         return undefined;
     }
     return 'http://api.fixer.io/latest?base=' + fromCurrency + '&symbols=' + supportedCurrencies;
@@ -178,29 +181,32 @@ function requestCurrencyFile(url, fileEndCallback) {
 }
 
 /**
+ * @typedef {Object} S3UploadParams
+ * @property {string} Bucket - Name of the bucket to which the PUT operation was initiated.
+ * @property {string} Key - Object key for which the PUT operation was initiated.
+ * @property {Buffer|Array|Blob|String|ReadableStream} Body - Object data
+ * @property {Date} Expires - The date and time at which the object is no longer cacheable.
+ */
+
+/**
  * @param {S3UploadParams} params
  * @param context
  */
 function uploadDocumentToS3(params, context) {
     if (params === null || typeof params !== 'object') {
-        logError('#176', 'invalid \"params\" argument passed to \"uploadDocumentToS3\"');
+        logError('Error: invalid params argument passed to uploadDocumentToS3', params);
         return;
     }
-
     if (context === null || typeof context !== 'object' || !context.hasOwnProperty('done') || typeof context.done !== 'function') {
-        logError('#181', 'invalid \"context\" argument passed to \"uploadDocumentToS3\"');
+        logError('Error: invalid context argument passed to uploadDocumentToS3', context);
         return;
     }
 
     log('rates s3 upload to: ' + params.Bucket + ' ' + params.Key);
-    /**
-     * @type {S3}
-     */
+
+    // Upload assembled currency json to S3 bucket
     const s3 = new aws.S3();
-    /**
-     * Uploads an arbitrarily sized buffer, blob, or stream
-     * See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#upload-property} for more information
-     */
+    // upload callback executes context.done on complete or error
     return s3.upload(params, (e, data) => {
         if (e) {
             logError(e.lineNumber, e.message);
@@ -217,15 +223,10 @@ function uploadDocumentToS3(params, context) {
  * @returns {{dataAsOf: string, conversions: {}}}
  */
 function createDocument(results) {
-    /**
-     * @type {Object}
-     */
     const conversions = {};
-
     for (let cv = 0; cv < results.length; cv++) {
         conversions[results[cv].base] = results[cv].rates;
     }
-
     return {
         'dataAsOf': new Date().toDateString().split('T')[0],
         'conversions': conversions
@@ -233,22 +234,26 @@ function createDocument(results) {
 }
 
 /**
- * @param {string} line
+ * @param {*} line
  */
 function log(line) {
-    if (debug) console.log(line);
+    if (getDebug()) console.log(line);
 }
 
 /**
- * @param {string} line
- * @param {string|Error|Object} error
+ * @param {*} line
+ * @param {*} error
  */
 function logError(line, error) {
     console.error(line, error);
 }
 
 exports.spec = {
-    handler,
+    getDebug,
+    getFilename,
+    getBucket,
+    log,
+    logError,
     constructCurrencyUrl,
     requestCurrencyFile,
     uploadDocumentToS3,
