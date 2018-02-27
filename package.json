@@ -9,10 +9,11 @@
     "type": "git",
     "url": "git+https://github.com/prebid/currency-file-generator.git"
   },
-  "author": "",
-  "license": "UNLICENSED",
+  "author": "Prebid.js Contributors",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/prebid/currency-file-generator#readme",
   "engines": {
-    "node": ">=6.1.0"
+    "node": ">=6.10.3"
   },
   "dependencies": {
     "aws-sdk": "^2.198.0"

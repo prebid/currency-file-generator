@@ -1,8 +1,6 @@
 /**
- * Loads currency rates from api.fixer.io and creates and uploads a JSON representation to S3.
- * @fileOverview prebidCurrencyRatesFileGenerator
- * @author Rubicon Project
- * @version 1.0.1
+ * @fileOverview Loads currency rates from api.fixer.io and creates and uploads a JSON representation to S3.
+ * @version 0.0.1
  */
 const http = require('http');
 const aws = require('aws-sdk');
@@ -14,14 +12,14 @@ const supportedCurrencies = 'AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS
 const expires = 24 * 3600 + 5;
 
 /**
- * @returns {boolean} returns env variable value if set or default
+ * @returns {boolean} env variable value if set or default
  */
 function getDebug() {
     return (typeof process.env.DEBUG !== 'undefined') ? (process.env.DEBUG === '1') : true;
 }
 
 /**
- * returns env variable value if set or default
+ *  env variable value if set or default
  * @returns {string}
  */
 function getBucket() {
@@ -29,7 +27,7 @@ function getBucket() {
 }
 
 /**
- * returns env variable value if set or default
+ * env variable value if set or default
  * @returns {string}
  */
 function getFilename() {
@@ -38,7 +36,8 @@ function getFilename() {
 
 /**
  * The function AWS Lambda calls to start execution of your Lambda function.
- * You identify the handler when you create your Lambda function: IE 'Handler':'currencyRatesFilesGen.handler'
+ * You identify the handler when you create your Lambda function: IE
+ * 'Handler':'currencyRatesFilesGen.handler'
  * @param event - AWS Lambda uses this parameter to pass in event data to the handler.
  * @param context - the context parameter contains functions to access runtime information
  */
@@ -48,23 +47,22 @@ exports.handler = function(event, context) {
     console.log('fromCurrencies', fromCurrencies);
 
     for (let fromCurrency of fromCurrencies) {
-        /**
-         * @type {string|undefined}
-         */
+        /** @type {string|undefined} */
         const currencyUrl = constructCurrencyUrl(fromCurrency, supportedCurrencies);
         if (!currencyUrl) {
             logError('Error: malformed currencyUrl', currencyUrl);
-            // no currencyUrl, exit
+            // error, exit
             return;
         }
 
+        // load currency json file from currency url
         requestCurrencyFile(currencyUrl, (json) => {
             if (json !== null && typeof json === 'object') {
                 results.push(json);
             }
             else {
                 logError('Error: malformed json:', json);
-                // json undefined, exit
+                // error, exit
                 return;
             }
 
@@ -73,17 +71,19 @@ exports.handler = function(event, context) {
                 const expiration = getExpiration(expires);
                 if (!expiration) {
                     logError('Error: malformed expiration date:', expiration);
-                    // expiration error, exit
+                    // error, exit
                     return;
                 }
 
                 const docParams = createDocumentParams(getBucket(), getFilename(), createDocument(results), expiration);
                 if (!docParams) {
                     logError('Error: malformed docParams:', docParams);
-                    // documentParams error, exit
+                    // error, exit
                     return;
                 }
 
+                // upload json to S3 bucket at key
+                // context.done() is called on complete/error
                 uploadDocumentToS3(docParams, context);
             }
         });
@@ -248,6 +248,10 @@ function logError(line, error) {
     console.error(line, error);
 }
 
+
+/**
+ * Export internal functions for testing
+ */
 exports.spec = {
     getDebug,
     getFilename,

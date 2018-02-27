@@ -1,19 +1,17 @@
 # currency-file-generator
+Loads currency rates from api.fixer.io and creates and uploads a JSON representation to S3.
+This code is used to generate the file that is published to <http://currency.prebid.org/latest.json>.
 
-This code is used to generate the file that is published to http://currency.prebid.org/latest.json.
+## Repo structure:
 
-___
+### Lambda Config
++ `src/currencyRatesFileGen.js` - File
++ `currencyRatesFilesGen.handler` - Handler
 
-#### AWS Lambda Source
-
-* This repo contains the source `src/currencyRatesFileGen.js`, which is code linked to an AWS Lambda configuration. 
-
-* A configuration property **Handler**, registers the `exports.handler` as the script entry point.
-
-___
-
-#### Tests
-Run the jest unit tests with:
-```
-npm run test
-```
+### Install
+    $ git clone https://github.com/prebid/currency-file-generator.git
+    $ cd currency-file-generator
+    $ npm install
+        
+### Test
+    $ npm run test
