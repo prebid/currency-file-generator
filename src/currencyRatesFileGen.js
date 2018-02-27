@@ -44,25 +44,32 @@ exports.handler = function(event, context) {
      * @type {Array.<Object>}
      */
     const results = [];
-    let countCompleted = 0;
 
     for (let fromCurrency of fromCurrencies) {
         /**
-         * @type {string}
+         * @type {string|undefined}
          */
         const currencyUrl = constructCurrencyUrl(fromCurrency, supportedCurrencies);
+        if (!currencyUrl) {
+            return;
+        }
 
-        /**
-         * This object is created internally and returned from http.request().
-         * @type {http.ClientRequest} - documented at https://nodejs.org/api/http.html#http_class_http_clientrequest
-         */
-        const currencyFileRequest = requestCurrencyFile(currencyUrl, (json) => {
-            results.push(json);
-            countCompleted++;
-            if (countCompleted === fromCurrencies.length) {
-                const docParams = createDocumentParams(bucket, filename, createDocument(results), getExpiration(expires));
-                if (typeof docParams === 'object') {
+        requestCurrencyFile(currencyUrl, (json) => {
+            // if there was an error requesting currency file, json will be 'undefined'
+            if (typeof json !== 'undefined') {
+                results.push(json);
+            }
+
+            if (results.length && fromCurrencies.length) {
+                const expiration = getExpiration(expires);
+
+                const docParams = createDocumentParams(bucket, filename, createDocument(results), expiration);
+
+                if (docParams !== null && typeof docParams === 'object') {
                     uploadDocumentToS3(docParams, context);
+                }
+                else {
+                    logError('Error uploadDocumentToS3 was not executed because docParams is undefined');
                 }
             }
         });
@@ -74,13 +81,13 @@ exports.handler = function(event, context) {
  * @param {string} filename
  * @param {Object} documentObj
  * @param {Date} expires - when to expire for HTTP "Expires:"
- * @return {S3UploadParams}
+ * @return {S3UploadParams|undefined}
  */
 function createDocumentParams(bucket, filename, documentObj, expires) {
     if (typeof bucket === 'string' && bucket !== '' &&
         typeof filename === 'string' && filename !== '' &&
         documentObj !== null && typeof documentObj === 'object' && !Array.isArray(documentObj) && Object.keys(documentObj).length > 0 &&
-        expires instanceof Date) {
+        documentObj !== null && typeof expires === 'object' && expires instanceof Date) {
         return {
             Bucket: bucket,
             Key: filename,
@@ -88,30 +95,35 @@ function createDocumentParams(bucket, filename, documentObj, expires) {
             Expires: expires
         }
     }
-    else {
-        return undefined;
-    }
+    return undefined;
 }
 
 /**
  * @param {number} expires - when to expire for HTTP "Expires:" header (seconds)
- * @return {Date}
+ * @return {Date|undefined}
  */
 function getExpiration(expires) {
     if (typeof expires === 'number' && !isNaN(expires)) {
         return new Date(new Date().getTime() + expires * 1000);
     }
-    else {
-        return undefined;
-    }
+    logError('Error: Invalid \"expiration\" value:', expires + ' ' + Object.prototype.toString.call(expires));
+    return undefined;
 }
 
 /**
  * @param {string} fromCurrency
  * @param {string} supportedCurrencies
- * @returns {string}
+ * @returns {string|undefined}
  */
 function constructCurrencyUrl(fromCurrency, supportedCurrencies) {
+    if (typeof fromCurrency !== 'string' || fromCurrency === '') {
+        logError('Error: currencyUrl, has invalid \"fromCurrency\"', fromCurrency + ' ' + Object.prototype.toString.call(fromCurrency));
+        return undefined;
+    }
+    if (typeof supportedCurrencies !== 'string' || supportedCurrencies === '') {
+        logError('Error: currencyUrl, has invalid \"supportedCurrencies\"', supportedCurrencies + ' ' + Object.prototype.toString.call(supportedCurrencies));
+        return undefined;
+    }
     return 'http://api.fixer.io/latest?base=' + fromCurrency + '&symbols=' + supportedCurrencies;
 }
 
@@ -133,17 +145,23 @@ function requestCurrencyFile(url, fileEndCallback) {
 
         // the 'error' event emits if the stream is unable to generate data due to internal failure or from an invalid chunk of data
         res.on('error', (e) => {
-            logError('request error', e);
+            logError(e.message);
+            fileEndCallback(undefined);
         });
 
         // The 'end' event is emitted after all data has been output.
         res.on('end', () => {
+            if (body === '') {
+                logError('Error: response body is empty');
+                fileEndCallback(undefined);
+            }
             try {
                 const json = JSON.parse(body);
                 fileEndCallback(json);
             }
             catch (e) {
-                logError('error parsing response', e);
+                logError(e.message, body);
+                fileEndCallback(undefined);
             }
         });
     });
@@ -154,30 +172,33 @@ function requestCurrencyFile(url, fileEndCallback) {
  * @param context
  */
 function uploadDocumentToS3(params, context) {
-    log('rates s3 upload to: ' + params.Bucket + ' ' + params.Key);
+    if (params === null || typeof params !== 'object') {
+        logError('#176', 'invalid \"params\" argument passed to \"uploadDocumentToS3\"');
+        return;
+    }
 
+    if (context === null || typeof context !== 'object' || !context.hasOwnProperty('done') || typeof context.done !== 'function') {
+        logError('#181', 'invalid \"context\" argument passed to \"uploadDocumentToS3\"');
+        return;
+    }
+
+    log('rates s3 upload to: ' + params.Bucket + ' ' + params.Key);
     /**
      * @type {S3}
      */
     const s3 = new aws.S3();
-
     /**
      * Uploads an arbitrarily sized buffer, blob, or stream
      * See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#upload-property} for more information
      */
-    s3.upload(params, (e, data) => {
-        /** @type {FileProps} */
-        let fileProps;
-
+    return s3.upload(params, (e, data) => {
         if (e) {
-            logError(e.toString(), e.stack);
-            fileProps = {filename: params.Key, error: data};
+            logError(e.lineNumber, e.message);
+            context.done(null, JSON.stringify({filename: params.Key, error: data}));
         } else {
             log('rates pushed to s3: ' + params.Bucket + ' ' + params.Key);
-            fileProps = {filename: params.Key, error: data};
+            context.done(null, JSON.stringify({filename: params.Key}));
         }
-
-        context.done(null, JSON.stringify(fileProps));
     });
 }
 
