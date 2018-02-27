@@ -39,11 +39,12 @@ const debug = true;
  * @param event - AWS Lambda uses this parameter to pass in event data to the handler.
  * @param context - the context parameter contains functions to access runtime information
  */
-exports.handler = function(event, context) {
+function handler(event, context) {
     /**
      * @type {Array.<Object>}
      */
     const results = [];
+    console.log('fromCurrencies', fromCurrencies);
 
     for (let fromCurrency of fromCurrencies) {
         /**
@@ -64,6 +65,7 @@ exports.handler = function(event, context) {
                 return;
             }
 
+            // All results loaded when results count is equal to fromCurrencies count
             if (results.length === fromCurrencies.length) {
                 const expiration = getExpiration(expires);
                 if (!expiration) {
@@ -81,7 +83,8 @@ exports.handler = function(event, context) {
             }
         });
     }
-};
+}
+exports.handler = handler;
 
 /**
  * @param {string} bucket
@@ -245,6 +248,7 @@ function logError(line, error) {
 }
 
 exports.spec = {
+    handler,
     constructCurrencyUrl,
     requestCurrencyFile,
     uploadDocumentToS3,
