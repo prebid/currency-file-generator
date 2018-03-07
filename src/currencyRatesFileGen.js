@@ -109,7 +109,6 @@ function createDocumentParams(bucket, filename, documentObj, expires) {
             Expires: expires
         }
     }
-    return undefined;
 }
 
 /**
@@ -120,7 +119,6 @@ function getExpiration(expires) {
     if (typeof expires === 'number' && !isNaN(expires)) {
         return new Date(new Date().getTime() + expires * 1000);
     }
-    return undefined;
 }
 
 /**
