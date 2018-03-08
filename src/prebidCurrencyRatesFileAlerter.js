@@ -103,8 +103,12 @@ const spec = {
      * @param key
      */
     createS3GetObjectParams(bucket, key) {
-        if (!bucket || !key) {
-            spec.logError('Error: missing argument for createS3GetObjectParams', Array.prototype.slice.call(arguments));
+        if (!bucket) {
+            spec.logArgumentError('createS3GetObjectParams', 'bucket');
+            return undefined;
+        }
+        if (!key) {
+            spec.logArgumentError('createS3GetObjectParams', 'key');
             return undefined;
         }
         return {
@@ -115,13 +119,11 @@ const spec = {
 
     /**
      * @param context
-     * @param loadSuccess
-     * @param loadError
      * @returns {function|undefined} - complete callback for AWS S3.getObject(params, "callback")
      */
     s3GetObjectHandler(context) {
         if (!context) {
-            spec.logError('Error: invalid arguments for s3GetObjectHandler');
+            spec.logArgumentError('s3GetObjectHandler', 'context');
             return undefined;
         }
         return function s3GetObjectCallback(err /** @type {AWSError} */, data /** @type {GetObjectOutput} */) {
@@ -138,12 +140,27 @@ const spec = {
      * @param context
      */
     currencyRatesLoadSuccess(data, context) {
+        if (!data) {
+            spec.logArgumentError('currencyRatesLoadSuccess', 'data');
+            return;
+        }
+        if (!context) {
+            spec.logArgumentError('currencyRatesLoadSuccess', 'context');
+            return;
+        }
+
         const currencyRates = spec.parseJson(data.Body.toString());
         if (!currencyRates) {
+            spec.logVariableError('currencyRatesLoadSuccess', 'currencyRates');
             return;
         }
 
         const fileResult = spec.getFileStaleResult(currencyRates.dataAsOf, getStaleOlderThanDays());
+        if (!fileResult) {
+            spec.logVariableError('currencyRatesLoadSuccess', 'fileResult');
+            return;
+        }
+
         if (fileResult.stale) {
             spec.logError(fileResult.result.message);
             spec.sendAlert(fileResult.result, context);
@@ -159,9 +176,17 @@ const spec = {
      * @param context
      */
     currencyRatesLoadError(err, context) {
+        if (!err) {
+            spec.logArgumentError('currencyRatesLoadError', 'err');
+            return;
+        }
+        if (!context) {
+            spec.logArgumentError('currencyRatesLoadError', 'context');
+            return;
+        }
+
         spec.logError(err, err.stack);
-        const result = spec.createResult(('Error reading currency rates file from S3: ' + err.message));
-        spec.sendAlert(result, context);
+        spec.sendAlert(spec.createResult('Error reading currency rates file from S3: ' + err.message), context);
     },
 
     /**
@@ -169,6 +194,11 @@ const spec = {
      * @returns {Object|undefined}
      */
     parseJson(data) {
+        if (!data) {
+            spec.logArgumentError('parseJson', 'data');
+            return undefined;
+        }
+
         let currencyRates;
         try {
             currencyRates = JSON.parse(data);
@@ -185,7 +215,18 @@ const spec = {
      * @returns {{stale:boolean, result:{message:string}|undefined}}
      */
     getFileStaleResult(dataAsOf, staleOlderThanDays) {
-        const fileDateResult = { stale: false };
+        if (!dataAsOf) {
+            spec.logArgumentError('getFileStaleResult', 'dataAsOf');
+            return undefined;
+        }
+        if (!staleOlderThanDays) {
+            spec.logArgumentError('getFileStaleResult', 'staleOlderThanDays');
+            return undefined;
+        }
+        const fileDateResult = {
+            stale: false
+        };
+
         const daysSinceCurrencyFile = spec.daysDifference(new Date(dataAsOf), new Date());
 
         if (daysSinceCurrencyFile > staleOlderThanDays) {
@@ -215,25 +256,24 @@ const spec = {
      */
     sendAlert(result, context) {
         if (!result) {
-            spec.logError('Error: result argument is undefined for sendAlert');
+            spec.logArgumentError('sendAlert', 'result');
             return undefined;
         }
-        const sendEmailParams = spec.createSendEmailParams({
-            alertTo: spec.getAlertTo(),
-            alertSubject: spec.getAlertSubject(),
-            alertFrom: spec.getAlertFrom(),
-            alertReplyTo: spec.getAlertFrom(),
-            message: result.message
-        });
+        if (!context) {
+            spec.logArgumentError('sendAlert', 'context');
+            return undefined;
+        }
+
+        const sendEmailParams = spec.createSendEmailParams(result.message);
 
         if (!sendEmailParams) {
-            spec.logError('Error missing argument for sendAlert');
+            spec.logVariableError('sendAlert', 'sendEmailParams');
             return;
         }
 
         const sendEmailCallback = spec.sendEmailHandler(result, context);
         if (!sendEmailCallback) {
-            spec.logError('Error missing arguments for sendAlert');
+            spec.logVariableError('sendAlert', 'sendEmailCallback');
             return;
         }
 
@@ -241,36 +281,33 @@ const spec = {
     },
 
     /**
-     * @param {{alertTo:string, alertSubject:string, alertFrom:string, alertReplyTo:string, message:string}} config
+     * @param {string} message
      * @returns {{Destination: {ToAddresses: Array<string>}, Message: {Subject: {Data: string, Charset: string}, Body: {Text: {Data: string|*, Charset: string}}}, Source: string, ReplyToAddresses: *[]}}
      */
-    createSendEmailParams(config) {
-        if (!['alertTo', 'alertSubject', 'alertFrom', 'alertReplyTo', 'message'].every(configProp => {
-            if (config[configProp]) return true;
-            spec.logError('Error: missing required argument for createSendEmailParams:' + configProp);
-            return false;
-        })) {
+    createSendEmailParams(message) {
+        if (!message) {
+            spec.logArgumentError('createSendEmailParams', 'message');
             return undefined;
         }
 
         return {
             Destination: {
-                ToAddresses: config.alertTo
+                ToAddresses: spec.getAlertTo()
             },
             Message: {
                 Subject: {
-                    Data: config.alertSubject,
+                    Data: spec.getAlertSubject(),
                     Charset: 'UTF-8'
                 },
                 Body: {
                     Text: {
-                        Data: config.message,
+                        Data: message,
                         Charset: 'UTF-8'
                     }
                 }
             },
-            Source: config.alertFrom,
-            ReplyToAddresses: [config.alertReplyTo]
+            Source: spec.getAlertFrom(),
+            ReplyToAddresses: [spec.getAlertFrom()]
         };
     },
 
@@ -281,11 +318,11 @@ const spec = {
      */
     sendEmailHandler(result, context) {
         if (!result) {
-            spec.logError('Error: missing "result" argument for sendEmailHandler');
+            spec.logArgumentError('sendEmailHandler', 'result');
             return undefined;
         }
         if (!context) {
-            spec.logError('Error: missing "context" argument for sendEmailHandler');
+            spec.logArgumentError('sendEmailHandler', 'context');
             return undefined;
         }
 
@@ -312,6 +349,22 @@ const spec = {
      */
     logError(line, error) {
         console.error(line, error);
+    },
+
+    /**
+     * @param {string} functionName
+     * @param {string} argumentName
+     */
+    logArgumentError(functionName, argumentName) {
+        spec.logError('Error: missing argument for ' + functionName + ': ' + argumentName);
+    },
+
+    /**
+     * @param {string} functionName
+     * @param {string} variableName
+     */
+    logVariableError(functionName, variableName) {
+        spec.logError('Error: undefined variable in ' + functionName + ': ' + variableName);
     }
 };
 exports.spec = spec;

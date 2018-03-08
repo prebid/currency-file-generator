@@ -138,16 +138,16 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
             });
 
             expect(currencyFileAlerter.spec.createS3GetObjectParams('bucket1')).toBeUndefined();
-            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams', ['bucket1']);
+            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams: key', undefined);
 
             expect(currencyFileAlerter.spec.createS3GetObjectParams(undefined, 'key1')).toBeUndefined();
-            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams', [undefined, 'key1']);
+            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams: bucket', undefined);
 
             expect(currencyFileAlerter.spec.createS3GetObjectParams({})).toBeUndefined();
-            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams', [{}]);
+            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams: key', undefined);
 
             expect(currencyFileAlerter.spec.createS3GetObjectParams(null)).toBeUndefined();
-            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams', [null]);
+            expect(global.console.error).toBeCalledWith('Error: missing argument for createS3GetObjectParams: bucket', undefined);
         });
 
         test('s3GetObjectHandler', () => {
@@ -156,7 +156,7 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
 
             // validate console error runs and no function returned for invalid argument
             const s3GetObjHandlerError = currencyFileAlerter.spec.s3GetObjectHandler();
-            expect(global.console.error).toBeCalledWith('Error: invalid arguments for s3GetObjectHandler', undefined);
+            expect(global.console.error).toBeCalledWith('Error: missing argument for s3GetObjectHandler: context', undefined);
             expect(s3GetObjHandlerError).toBeUndefined();
 
             // validate returned function
@@ -223,28 +223,24 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
             };
             aws.mocks.sesSendEmailResult = emailCallback;
 
-            currencyFileAlerter.spec.sendAlert(null, {
+            const context = {
                 done: function(n, v) {
                     console.info('context.done():', n, v);
                 }
-            });
-            expect(global.console.error).toBeCalledWith('Error: result argument is undefined for sendAlert', undefined);
+            };
+
+            currencyFileAlerter.spec.sendAlert(null, context);
+            expect(global.console.error).toBeCalledWith('Error: missing argument for sendAlert: result', undefined);
 
             jest.resetAllMocks();
 
-            currencyFileAlerter.spec.sendAlert({ message: '' }, {
-                done: function(n, v) {
-                    console.info('context.done():', n, v);
-                }
-            });
-            expect(global.console.error).toBeCalledWith('Error: missing required argument for createSendEmailParams:message', undefined);
+            currencyFileAlerter.spec.sendAlert({ message: '' }, context);
+            expect(global.console.error).toBeCalledWith('Error: undefined variable in sendAlert: sendEmailParams', undefined);
 
             jest.resetAllMocks();
 
             currencyFileAlerter.spec.sendAlert({ message: 'email sent' }, undefined);
-            expect(global.console.error).toBeCalledWith('Error missing arguments for sendAlert', undefined);
-
-            // expect(emailCallback).toBeCalledWith('one');
+            expect(global.console.error).toBeCalledWith('Error: missing argument for sendAlert: context', undefined);
         });
 
         test('createSendEmailParams', () => {
