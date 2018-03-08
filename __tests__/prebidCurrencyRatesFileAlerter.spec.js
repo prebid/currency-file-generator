@@ -244,7 +244,36 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         });
 
         test('createSendEmailParams', () => {
+            const referenceOutput = {
+                Destination: {ToAddresses: 'alerts@prebid.org'},
+                Message:
+                    {
+                        Subject:
+                            {
+                                Data: 'ALERT: Prebid Currency Rates File Monitor',
+                                Charset: 'UTF-8'
+                            },
+                        Body: {Text: [Object]}
+                    },
+                Source: 'alerts@prebid.org',
+                ReplyToAddresses: ['alerts@prebid.org']
+            };
 
+            const emailParams = currencyFileAlerter.spec.createSendEmailParams('currency file 1001 updated');
+            Object.keys(referenceOutput).forEach(emailParam => {
+                expect(emailParams.hasOwnProperty(emailParam)).toBeTruthy();
+                expect(emailParams[emailParam]).toBeDefined();
+
+                const refValue = (typeof referenceOutput[emailParam]);
+                switch (refValue) {
+                    case 'string':
+                        expect(typeof emailParams[emailParam] === 'string').toBeTruthy();
+                        break;
+                    case 'object':
+                        expect(typeof emailParams[emailParam] === 'object').toBeTruthy();
+                        break;
+                }
+            });
         });
 
         test('sendEmailHandler', () => {
