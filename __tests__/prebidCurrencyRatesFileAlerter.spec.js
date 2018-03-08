@@ -1,51 +1,47 @@
-// mock aws-sdk
-jest.mock('aws-sdk', () => {
-    const mocks = {
-        s3GetObjectResult: undefined,
-        sesSendEmailResult: undefined
-    };
+let aws;
+let currencyFileAlerter;
+let sendEmail;
+let getObject;
+let SES;
+let S3;
 
-    function S3() {}
+function initMocks() {
+    aws = require('aws-sdk');
 
-    S3.prototype.getObject = function(params, callback) {
-        if (typeof mocks.s3GetObjectResult === 'function') {
-            mocks.s3GetObjectResult.call(null, params, callback);
-        }
-        else {
-            console.info('<<<<< No callback for \"aws.mocks.s3GetObjectResult\"');
-        }
-    };
+    // aws.SES
+    sendEmail = jest.fn((params, callback) => {
+        callback.call(null, {});
+    });
+    SES = jest.fn(() => ({
+        sendEmail: sendEmail
+    }));
+    aws.SES = SES;
 
-    function SES() {}
+    // aws.S3
+    getObject = jest.fn((params, callback) => {
+        callback.call(null, {});
+    });
+    S3 = jest.fn(() => ({
+        getObject: getObject
+    }));
+    aws.S3 = S3;
 
-    SES.prototype.sendEmail = function(params, callback) {
-        if (typeof mocks.sesSendEmailResult === 'function') {
-            mocks.sesSendEmailResult.call(null, params, callback);
-        }
-        else {
-            console.info('<<<<< No callback for \"aws.mocks.sesSendEmailResult\"');
-        }
-    };
-
-    return {
-        S3,
-        SES,
-        mocks
-    }
-});
-
-const aws = require('aws-sdk');
-let currencyFileAlerter = require('../src/prebidCurrencyRatesFileAlerter');
+    currencyFileAlerter = require('../src/prebidCurrencyRatesFileAlerter');
+}
 
 describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
     beforeAll(() => {
-        jest.resetAllMocks();
+
     });
 
     beforeEach(() => {
         global.console.error = jest.fn();
         global.console.log = jest.fn();
-        currencyFileAlerter = require('../src/prebidCurrencyRatesFileAlerter');
+        initMocks();
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     describe('Unit Tests', () => {
@@ -153,6 +149,9 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         test('s3GetObjectHandler', () => {
             const mockLoadSuccess = jest.spyOn(currencyFileAlerter.spec, 'currencyRatesLoadSuccess');
             const mockLoadError = jest.spyOn(currencyFileAlerter.spec, 'currencyRatesLoadError');
+            const context = {
+                done: jest.fn()
+            };
 
             // validate console error runs and no function returned for invalid argument
             const s3GetObjHandlerError = currencyFileAlerter.spec.s3GetObjectHandler();
@@ -160,28 +159,32 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
             expect(s3GetObjHandlerError).toBeUndefined();
 
             // validate returned function
-            const s3GetObjHandler = currencyFileAlerter.spec.s3GetObjectHandler({});
+            const s3GetObjHandler = currencyFileAlerter.spec.s3GetObjectHandler(context);
             expect(s3GetObjHandler).toBeInstanceOf(Function);
             expect(s3GetObjHandler.name).toEqual('s3GetObjectCallback');
             expect(s3GetObjHandler.length).toBe(2);
 
             // test returned function
             s3GetObjHandler({}, undefined);
-            expect(mockLoadError).toBeCalledWith({}, {});
+            expect(mockLoadError).toBeCalledWith({}, context);
             expect(mockLoadSuccess).not.toBeCalled();
 
             jest.resetAllMocks();
 
             s3GetObjHandler(undefined, {});
-            expect(mockLoadSuccess).toBeCalledWith({}, {});
+            expect(mockLoadSuccess).toBeCalledWith({}, context);
             expect(mockLoadError).not.toBeCalled();
         });
 
         test('currencyRatesLoadSuccess', () => {
-
+            // TODO
         });
 
         test('currencyRatesLoadError', () => {
+            const context = {
+                done: jest.fn()
+            };
+
             const mockLogError = jest.spyOn(currencyFileAlerter.spec, 'logError');
             const mockSendAlert = jest.spyOn(currencyFileAlerter.spec, 'sendAlert');
 
@@ -190,9 +193,9 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
                 stack:'app.com.Main arg[0]'
             };
 
-            currencyFileAlerter.spec.currencyRatesLoadError(err, {});
+            currencyFileAlerter.spec.currencyRatesLoadError(err, context);
             expect(mockLogError).toBeCalledWith(err, err.stack);
-            expect(mockSendAlert).toBeCalledWith({ message: 'Error reading currency rates file from S3: null obj' }, {});
+            expect(mockSendAlert).toBeCalledWith({ message: 'Error reading currency rates file from S3: null obj' }, context);
 
             jest.resetAllMocks();
 
@@ -209,19 +212,18 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
 
         test('getFileStaleResult', () => {
             const fileStaleResult = currencyFileAlerter.spec.getFileStaleResult(13413134, 2);
-            console.info(fileStaleResult);
+            // TODO
         });
 
         test('daysDifference', () => {
             const daysDiff = currencyFileAlerter.spec.daysDifference(324234, new Date());
-            console.info(daysDiff);
+            // TODO
         });
 
         test('sendAlert', () => {
             const emailCallback = function emailCallback(params, callback) {
                 console.info('emailCallback():', params, callback);
             };
-            aws.mocks.sesSendEmailResult = emailCallback;
 
             const context = {
                 done: function(n, v) {
@@ -260,6 +262,7 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
             };
 
             const emailParams = currencyFileAlerter.spec.createSendEmailParams('currency file 1001 updated');
+
             Object.keys(referenceOutput).forEach(emailParam => {
                 expect(emailParams.hasOwnProperty(emailParam)).toBeTruthy();
                 expect(emailParams[emailParam]).toBeDefined();
@@ -270,14 +273,39 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
                         expect(typeof emailParams[emailParam] === 'string').toBeTruthy();
                         break;
                     case 'object':
-                        expect(typeof emailParams[emailParam] === 'object').toBeTruthy();
+                        expect((emailParams[emailParam] && typeof emailParams[emailParam] === 'object')).toBeTruthy();
                         break;
                 }
             });
         });
 
         test('sendEmailHandler', () => {
+            const fileStaleResult = {
+                message:'currency file stale 1002'
+            };
+            const context = {
+                done: jest.fn()
+            };
+            const awsError = {
+                message: 'aws S3.sendEmail error',
+                stack: 'org.test.error'
+            };
 
+            // test callback construction
+            const callback = currencyFileAlerter.spec.sendEmailHandler(fileStaleResult, context);
+            expect(callback).toBeInstanceOf(Function);
+            expect(callback.name).toEqual('sendEmailCallback');
+            expect(callback.length).toBe(2);
+
+            // sendEmail error response
+            callback(awsError, null);
+            expect(global.console.error).toBeCalledWith({'message': 'aws S3.sendEmail error', 'stack': 'org.test.error'}, 'org.test.error');
+            expect(context.done).toBeCalledWith(null, fileStaleResult);
+
+            // sendEmail success response
+            callback(null, {});
+            expect(global.console.log).toBeCalledWith('Alert \'' + fileStaleResult.message + '\' sent.');
+            expect(context.done).toBeCalledWith(null, fileStaleResult);
         });
     });
 });

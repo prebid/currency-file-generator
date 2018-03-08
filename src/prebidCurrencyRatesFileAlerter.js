@@ -3,8 +3,6 @@
  * @version 0.0.1
  */
 const aws = require('aws-sdk');
-const s3 = new aws.S3();
-const ses = new aws.SES();
 
 /**
  * The function AWS Lambda calls to start execution of your Lambda function.
@@ -25,14 +23,17 @@ exports.handler = (event, context) => {
         return;
     }
 
-    s3.getObject(objectRequestParams, s3GetObjectHandler);
+    spec.s3.getObject(objectRequestParams, s3GetObjectHandler);
 };
 
 /**
  * Export internal functions for testing
  */
 const spec = {
-    /**
+    s3: new aws.S3(),
+    ses: new aws.SES(),
+
+/**
      * @returns {boolean} env variable value if set or default
      */
     getDebug() {
@@ -277,7 +278,7 @@ const spec = {
             return;
         }
 
-        ses.sendEmail(sendEmailParams, sendEmailCallback);
+        spec.ses.sendEmail(sendEmailParams, sendEmailCallback);
     },
 
     /**
@@ -330,7 +331,7 @@ const spec = {
             if (err) {
                 spec.logError(err, err.stack);
             } else {
-                spec.log('Alert \'' + result.message + '\' sent. ');
+                spec.log('Alert \'' + result.message + '\' sent.');
             }
             context.done(null, result);
         };
