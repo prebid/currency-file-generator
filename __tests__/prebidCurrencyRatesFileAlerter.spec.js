@@ -10,7 +10,7 @@ function initMocks() {
 
     // aws.SES
     sendEmail = jest.fn((params, callback) => {
-        callback.call(null, {});
+            callback(null, {});
     });
     SES = jest.fn(() => ({
         sendEmail: sendEmail
@@ -19,7 +19,7 @@ function initMocks() {
 
     // aws.S3
     getObject = jest.fn((params, callback) => {
-        callback.call(null, {});
+        callback(null, {});
     });
     S3 = jest.fn(() => ({
         getObject: getObject
@@ -29,11 +29,16 @@ function initMocks() {
     currencyFileAlerter = require('../src/prebidCurrencyRatesFileAlerter');
 }
 
+// Helper Constants
+const SECONDS_IN_MINUTE = 60;
+const SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE;
+const SECONDS_IN_DAY = SECONDS_IN_HOUR * 24;
+// Mon Jan 01 2018 12:30:40 GMT-0800 (PST)
+const TIME_IN_MS_JAN_1_2018 = 1514838640000;
+
+const emailValidationRegEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
 describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
-    beforeAll(() => {
-
-    });
-
     beforeEach(() => {
         global.console.error = jest.fn();
         global.console.log = jest.fn();
@@ -177,7 +182,37 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         });
 
         test('currencyRatesLoadSuccess', () => {
-            // TODO
+            const context = {
+                done: jest.fn()
+            };
+
+            const dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
+                return (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY));
+            });
+
+            const mockDaysDifference = jest.spyOn(currencyFileAlerter.spec, 'daysDifference');
+
+            const data = {
+                Body: '{"dataAsOf":'+TIME_IN_MS_JAN_1_2018+'}'
+            };
+
+            currencyFileAlerter.spec.currencyRatesLoadSuccess(data, context);
+            expect(mockDaysDifference).toBeCalledWith(TIME_IN_MS_JAN_1_2018, TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY));
+            expect(context.done).toBeCalledWith(null, {
+                message: 'The Prebid currency rates conversion data has a timestamp of 1514838640000, found not to be stale.'
+            });
+
+            jest.resetAllMocks();
+
+            dateNowSpy.mockImplementation(() => {
+                return (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 4) - SECONDS_IN_HOUR);
+            });
+
+            mockDaysDifference.mockReset();
+
+            currencyFileAlerter.spec.currencyRatesLoadSuccess(data, context);
+            expect(mockDaysDifference).toBeCalledWith(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 4) - SECONDS_IN_HOUR));
+            // expect(context.done).toBeCalledWith('');
         });
 
         test('currencyRatesLoadError', () => {
@@ -211,25 +246,42 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         });
 
         test('getFileStaleResult', () => {
-            const fileStaleResult = currencyFileAlerter.spec.getFileStaleResult(13413134, 2);
-            // TODO
+            const fileStaleResult = currencyFileAlerter.spec.getFileStaleResult(TIME_IN_MS_JAN_1_2018, 2);
+            expect(fileStaleResult).toEqual({
+                stale: true,
+                result: {
+                    message: 'The Prebid currency rates conversion data has a stale timestamp of 1514838640000. Please check the generator logs for failures: https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logStream:group=/aws/lambda/prebidCurrencyRatesFileGenerator;streamFilter=typeLogStreamPrefix'
+                }
+            });
         });
 
         test('daysDifference', () => {
-            const daysDiff = currencyFileAlerter.spec.daysDifference(324234, new Date());
-            // TODO
+            expect(currencyFileAlerter.spec.daysDifference(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY/3) * 1000)))).toBe(0);
+            expect(currencyFileAlerter.spec.daysDifference(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY/2) * 1000)))).toBe(1);
+            expect(currencyFileAlerter.spec.daysDifference(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 1000)))).toBe(1);
+            expect(currencyFileAlerter.spec.daysDifference(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY * 2) * 1000)))).toBe(2);
+            expect(currencyFileAlerter.spec.daysDifference(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY * 30) * 1000)))).toBe(30);
+            expect(currencyFileAlerter.spec.daysDifference(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY * 100) * 1000)))).toBe(100);
         });
 
         test('sendAlert', () => {
-            const emailCallback = function emailCallback(params, callback) {
-                console.info('emailCallback():', params, callback);
+            const context = {
+                done: jest.fn()
             };
 
-            const context = {
-                done: function(n, v) {
-                    console.info('context.done():', n, v);
-                }
+            const resultMessage = {
+                message: 'email sent'
             };
+
+            const mockSendEmailHandler = jest.spyOn(currencyFileAlerter.spec, 'sendEmailHandler');
+
+            currencyFileAlerter.spec.sendAlert(resultMessage, context);
+            expect(mockSendEmailHandler).toBeCalledWith({
+                'message': 'email sent'
+            }, context);
+            expect(context.done).toHaveBeenCalled();
+
+            jest.resetAllMocks();
 
             currencyFileAlerter.spec.sendAlert(null, context);
             expect(global.console.error).toBeCalledWith('Error: missing argument for sendAlert: result', undefined);
@@ -241,42 +293,35 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
 
             jest.resetAllMocks();
 
-            currencyFileAlerter.spec.sendAlert({ message: 'email sent' }, undefined);
+            currencyFileAlerter.spec.sendAlert(resultMessage, undefined);
             expect(global.console.error).toBeCalledWith('Error: missing argument for sendAlert: context', undefined);
         });
 
         test('createSendEmailParams', () => {
-            const referenceOutput = {
-                Destination: {ToAddresses: 'alerts@prebid.org'},
-                Message:
-                    {
-                        Subject:
-                            {
-                                Data: 'ALERT: Prebid Currency Rates File Monitor',
-                                Charset: 'UTF-8'
-                            },
-                        Body: {Text: [Object]}
+            const emailParamsValidationObj = {
+                Destination: {
+                    ToAddresses: expect.stringMatching(emailValidationRegEx),
+                },
+                Message: {
+                    Subject: {
+                        Data: expect.any(String),
+                        Charset: 'UTF-8'
                     },
-                Source: 'alerts@prebid.org',
-                ReplyToAddresses: ['alerts@prebid.org']
+                    Body: {
+                        Text: {
+                            Data: expect.any(String),
+                            Charset: 'UTF-8'
+                        }
+                    }
+                },
+                Source: expect.stringMatching(emailValidationRegEx),
+                ReplyToAddresses: expect.arrayContaining([
+                    expect.stringMatching(emailValidationRegEx)
+                ])
             };
 
             const emailParams = currencyFileAlerter.spec.createSendEmailParams('currency file 1001 updated');
-
-            Object.keys(referenceOutput).forEach(emailParam => {
-                expect(emailParams.hasOwnProperty(emailParam)).toBeTruthy();
-                expect(emailParams[emailParam]).toBeDefined();
-
-                const refValue = (typeof referenceOutput[emailParam]);
-                switch (refValue) {
-                    case 'string':
-                        expect(typeof emailParams[emailParam] === 'string').toBeTruthy();
-                        break;
-                    case 'object':
-                        expect((emailParams[emailParam] && typeof emailParams[emailParam] === 'object')).toBeTruthy();
-                        break;
-                }
-            });
+            expect(emailParams).toMatchObject(emailParamsValidationObj);
         });
 
         test('sendEmailHandler', () => {

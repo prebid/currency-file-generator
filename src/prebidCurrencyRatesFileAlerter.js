@@ -156,7 +156,7 @@ const spec = {
             return;
         }
 
-        const fileResult = spec.getFileStaleResult(currencyRates.dataAsOf, getStaleOlderThanDays());
+        const fileResult = spec.getFileStaleResult(currencyRates.dataAsOf, spec.getStaleOlderThanDays());
         if (!fileResult) {
             spec.logVariableError('currencyRatesLoadSuccess', 'fileResult');
             return;
@@ -228,7 +228,7 @@ const spec = {
             stale: false
         };
 
-        const daysSinceCurrencyFile = spec.daysDifference(new Date(dataAsOf), new Date());
+        const daysSinceCurrencyFile = spec.daysDifference((new Date(dataAsOf)).getTime(), Date.now());
 
         if (daysSinceCurrencyFile > staleOlderThanDays) {
             fileDateResult.stale = true;
@@ -243,8 +243,8 @@ const spec = {
     },
 
     /**
-     * @param {Date} first
-     * @param {Date} second
+     * @param {number} first - file date in ms
+     * @param {number} second - current date in ms
      * @returns {number}
      */
     daysDifference(first, second) {
@@ -277,7 +277,6 @@ const spec = {
             spec.logVariableError('sendAlert', 'sendEmailCallback');
             return;
         }
-
         spec.ses.sendEmail(sendEmailParams, sendEmailCallback);
     },
 
@@ -328,6 +327,7 @@ const spec = {
         }
 
         return function sendEmailCallback(err /** {AWSError} */, data /** @type {SendEmailResponse} */) {
+            console.info('callback', result, err);
             if (err) {
                 spec.logError(err, err.stack);
             } else {
