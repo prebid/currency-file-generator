@@ -257,6 +257,18 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
                     message: 'The Prebid currency rates conversion data has a stale timestamp of 1514838640000. Please check the generator logs for failures: https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logStream:group=/aws/lambda/prebidCurrencyRatesFileGenerator;streamFilter=typeLogStreamPrefix'
                 }
             });
+
+            let dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
+                return (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 1000));
+            });
+
+            const fileNotStaleResult = currencyFileAlerter.spec.getFileStaleResult(TIME_IN_MS_JAN_1_2018, 2);
+            expect(fileNotStaleResult).toEqual({
+                stale: false,
+                result: {
+                    message: 'The Prebid currency rates conversion data has a timestamp of 1514838640000, found not to be stale.'
+                }
+            });
         });
 
         test('daysDifference', () => {
