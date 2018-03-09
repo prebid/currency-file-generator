@@ -266,7 +266,6 @@ const spec = {
         }
 
         const sendEmailParams = spec.createSendEmailParams(result.message);
-
         if (!sendEmailParams) {
             spec.logVariableError('sendAlert', 'sendEmailParams');
             return;
@@ -327,7 +326,6 @@ const spec = {
         }
 
         return function sendEmailCallback(err /** {AWSError} */, data /** @type {SendEmailResponse} */) {
-            console.info('callback', result, err);
             if (err) {
                 spec.logError(err, err.stack);
             } else {
