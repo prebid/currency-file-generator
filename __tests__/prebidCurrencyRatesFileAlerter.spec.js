@@ -19,7 +19,9 @@ function initMocks() {
 
     // aws.S3
     getObject = jest.fn((params, callback) => {
-        callback(null, {});
+        callback(null, {
+            Body: '{"dataAsOf":"2018-01-01","conversions":{"USD":{"AUD":1.2811,"BRL":3.2414,"CAD":1.2917,"CHF":0.94445,"CNY":6.3357,"CZK":20.471,"DKK":5.9983,"EUR":0.80509,"GBP":0.72027,"HKD":7.838,"HUF":251.2,"IDR":13779,"ILS":3.45,"INR":65.13,"JPY":106.13,"KRW":1071.8,"MXN":18.693,"MYR":3.9065,"NOK":7.8202,"NZD":1.3769,"PHP":52.046,"PLN":3.3848,"RUB":56.895,"SEK":8.2256,"SGD":1.3154,"THB":31.335,"TRY":3.8102,"ZAR":11.889},"GBP":{"AUD":1.7786,"BRL":4.5002,"CAD":1.7933,"CHF":1.3112,"CNY":8.7963,"CZK":28.421,"DKK":8.3278,"EUR":1.1178,"HKD":10.882,"HUF":348.76,"IDR":19130,"ILS":4.7898,"INR":90.424,"JPY":147.35,"KRW":1488.1,"MXN":25.952,"MYR":5.4237,"NOK":10.857,"NZD":1.9116,"PHP":72.258,"PLN":4.6993,"RUB":78.991,"SEK":11.42,"SGD":1.8263,"THB":43.504,"TRY":5.2899,"USD":1.3884,"ZAR":16.506}}}'
+        });
     });
     S3 = jest.fn(() => ({
         getObject: getObject
@@ -49,7 +51,28 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         jest.restoreAllMocks();
     });
 
+    describe('Integration', () => {
+        test('handler', () => {
+            let dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
+                return (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY * 1000) * 4));
+            });
+
+            const context = {
+                done: jest.fn()
+            };
+            const event = {
+                type: 'test'
+            };
+
+            currencyFileAlerter.handler(event, context);
+            expect(context.done).toBeCalledWith(null, {
+                'message': 'The Prebid currency rates conversion data has a stale timestamp of 2018-01-01. Please check the generator logs for failures: https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logStream:group=/aws/lambda/prebidCurrencyRatesFileGenerator;streamFilter=typeLogStreamPrefix'
+            });
+        });
+    });
+
     describe('Unit Tests', () => {
+
         test('getDebug', () => {
             expect(currencyFileAlerter.spec.getDebug()).toBeTruthy();
             process.env.DEBUG = 0;
