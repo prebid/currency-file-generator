@@ -186,33 +186,37 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
                 done: jest.fn()
             };
 
-            const dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
-                return (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY));
+            let dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
+                return (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 1000));
             });
 
-            const mockDaysDifference = jest.spyOn(currencyFileAlerter.spec, 'daysDifference');
+            let mockDaysDifference = jest.spyOn(currencyFileAlerter.spec, 'daysDifference');
 
             const data = {
                 Body: '{"dataAsOf":'+TIME_IN_MS_JAN_1_2018+'}'
             };
 
             currencyFileAlerter.spec.currencyRatesLoadSuccess(data, context);
-            expect(mockDaysDifference).toBeCalledWith(TIME_IN_MS_JAN_1_2018, TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY));
+            expect(mockDaysDifference).toBeCalledWith(TIME_IN_MS_JAN_1_2018, TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 1000));
             expect(context.done).toBeCalledWith(null, {
                 message: 'The Prebid currency rates conversion data has a timestamp of 1514838640000, found not to be stale.'
             });
 
             jest.resetAllMocks();
+            jest.restoreAllMocks();
 
-            dateNowSpy.mockImplementation(() => {
-                return (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 4) - SECONDS_IN_HOUR);
+            mockDaysDifference = jest.spyOn(currencyFileAlerter.spec, 'daysDifference');
+            context.done = jest.fn();
+            dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
+                return (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY * 1000) * 4));
             });
 
-            mockDaysDifference.mockReset();
+            const dataStale = {
+                Body: '{"dataAsOf":'+(TIME_IN_MS_JAN_1_2018 - ((SECONDS_IN_DAY * 1000) * 4))+'}'
+            };
 
-            currencyFileAlerter.spec.currencyRatesLoadSuccess(data, context);
-            expect(mockDaysDifference).toBeCalledWith(TIME_IN_MS_JAN_1_2018, (TIME_IN_MS_JAN_1_2018 + (SECONDS_IN_DAY * 4) - SECONDS_IN_HOUR));
-            // expect(context.done).toBeCalledWith('');
+            currencyFileAlerter.spec.currencyRatesLoadSuccess(dataStale, context);
+            expect(mockDaysDifference).toBeCalledWith(1514493040000, 1515184240000);
         });
 
         test('currencyRatesLoadError', () => {
