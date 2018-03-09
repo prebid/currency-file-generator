@@ -51,7 +51,7 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         jest.restoreAllMocks();
     });
 
-    describe('Integration', () => {
+    describe('Integration Tests', () => {
         test('handler', () => {
             let dateNowSpy = jest.spyOn(global.Date, 'now').mockImplementation(() => {
                 return (TIME_IN_MS_JAN_1_2018 + ((SECONDS_IN_DAY * 1000) * 4));
