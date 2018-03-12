@@ -61,7 +61,7 @@ const spec = {
      * @returns {string}
      */
     getAlertFrom() {
-        return process.env.ALERT_FROM || 'alerts@prebid.org';
+        return process.env.ALERT_FROM || 'alerts-forward@prebid.org';
     },
 
     /**
@@ -69,7 +69,7 @@ const spec = {
      * @returns {string}
      */
     getAlertTo() {
-        return process.env.ALERT_TO || 'alerts@prebid.org';
+        return process.env.ALERT_TO || 'alerts-forward@prebid.org';
     },
 
     /**
