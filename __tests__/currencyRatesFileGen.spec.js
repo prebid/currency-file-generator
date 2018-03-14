@@ -62,6 +62,11 @@ const SECONDS_IN_DAY = SECONDS_IN_HOUR * 24;
 // Mon Jan 01 2018 12:30:40 GMT-0800 (PST)
 const TIME_IN_MS_JAN_1_2018 = 1514838640000;
 
+function isValidDate(dateString) {
+    var regEx = /^\d{4}-\d{2}-\d{2}$/;
+    return dateString.match(regEx) != null;
+}
+
 describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful operations`, () => {
     beforeAll(() => {
         global.console.error = jest.fn();
@@ -150,6 +155,7 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             }]);
 
             expect(doc['conversions']).toEqual({"1.5": [4, 65, 90], "30.2": [2, 4, 65, 90, 23]});
+            expect(isValidDate(doc.dataAsOf)).toBeTruthy();
         });
 
         test('requestCurrencyFile', () => {
