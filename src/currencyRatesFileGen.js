@@ -226,7 +226,7 @@ function createDocument(results) {
         conversions[results[cv].base] = results[cv].rates;
     }
     return {
-        'dataAsOf': new Date().toDateString().split('T')[0],
+        'dataAsOf': new Date().toISOString().split('T')[0],
         'conversions': conversions
     };
 }
