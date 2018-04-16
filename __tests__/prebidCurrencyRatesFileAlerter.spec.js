@@ -100,19 +100,19 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         });
 
         test('getAlertFrom', () => {
-            expect(currencyFileAlerter.spec.getAlertFrom()).toEqual('alerts@prebid.org');
+            expect(currencyFileAlerter.spec.getAlertFrom()).toEqual('alerts-forward@prebid.org');
             process.env.ALERT_FROM = 'alerts1@prebid.org';
             expect(currencyFileAlerter.spec.getAlertFrom()).toEqual('alerts1@prebid.org');
             delete process.env.ALERT_FROM;
-            expect(currencyFileAlerter.spec.getAlertFrom()).toEqual('alerts@prebid.org');
+            expect(currencyFileAlerter.spec.getAlertFrom()).toEqual('alerts-forward@prebid.org');
         });
 
         test('getAlertTo', () => {
-            expect(currencyFileAlerter.spec.getAlertTo()).toEqual('alerts@prebid.org');
+            expect(currencyFileAlerter.spec.getAlertTo()).toEqual('alerts-forward@prebid.org');
             process.env.ALERT_TO = 'alerts1@prebid.org';
             expect(currencyFileAlerter.spec.getAlertTo()).toEqual('alerts1@prebid.org');
             delete process.env.ALERT_TO;
-            expect(currencyFileAlerter.spec.getAlertTo()).toEqual('alerts@prebid.org');
+            expect(currencyFileAlerter.spec.getAlertTo()).toEqual('alerts-forward@prebid.org');
         });
 
         test('getStaleOlderThanDays', () => {
