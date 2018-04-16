@@ -6,7 +6,7 @@ const http = require('http');
 const aws = require('aws-sdk');
 
 const fromCurrencies = ['USD', 'GBP'];
-const supportedCurrencies = 'AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR';
+const supportedCurrencies = 'AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,TWD,USD,ZAR';
 
 // when to expire for HTTP "Expires:" header (seconds)
 const expires = 24 * 3600 + 5;
