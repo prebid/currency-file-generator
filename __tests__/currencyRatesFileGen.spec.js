@@ -1,4 +1,4 @@
-const http = require('http');
+const https = require('https');
 
 // mock aws-sdk
 jest.mock('aws-sdk', () => {
@@ -27,7 +27,7 @@ jest.mock('aws-sdk', () => {
 const aws = require('aws-sdk');
 const {spec, handler} = require('../src/currencyRatesFileGen');
 
-// Mock for http.get callback argument: response
+// Mock for https.get callback argument: response
 const resp = {
     eventHandlers: {},
     data(chunk) {
@@ -79,17 +79,17 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             const dateGetTimeSpy = jest.spyOn(global.Date.prototype, 'getTime').mockImplementation(() => {
                 return TIME_IN_MS_JAN_1_2018;
             });
-            // Mock http get
-            const httpGetSpy = jest.spyOn(http, 'get').mockImplementation((url, callback) => {
+            // Mock https get
+            const httpGetSpy = jest.spyOn(https, 'get').mockImplementation((url, callback) => {
                 callback(resp);
                 switch (url) {
-                    case 'http://api.fixer.io/latest?base=USD&symbols=AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR':
+                    case 'https://exchangeratesapi.io/api/latest?base=USD':
                         resp.data('{');
                         resp.data('"base":"USD","date":"2018-02-26","rates":{"AUD":1.2752,"BRL":3.2351,"CAD":1.2676,"CHF":0.93588,"CNY":6.3087,"CZK":20.61,"DKK":6.0438,"EUR":0.81169,"GBP":0.71282,"HKD":7.8236,"HUF":254.54,"IDR":13664.0,"ILS":3.493,"INR":64.775,"JPY":106.82,"KRW":1071.6,"MXN":18.602,"MYR":3.9095,"NOK":7.8168,"NZD":1.3675,"PHP":51.896,"PLN":3.3845,"RUB":55.958,"SEK":8.1526,"SGD":1.3171,"THB":31.32,"TRY":3.7808,"ZAR":11.593}');
                         resp.data('}');
                         resp.end();
                         break;
-                    case 'http://api.fixer.io/latest?base=GBP&symbols=AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR':
+                    case 'https://exchangeratesapi.io/api/latest?base=GBP':
                         resp.data('{');
                         resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
                         resp.data('}');
@@ -117,27 +117,13 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
 
     describe('Unit Tests', () => {
         test('constructCurrencyUrl', () => {
-            expect(spec.constructCurrencyUrl('USD', 'AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR'))
-                .toEqual('http://api.fixer.io/latest?base=USD&symbols=AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR');
-
-            expect(spec.constructCurrencyUrl('USD', 'AUD,BRL,CAD,CHF')).toEqual('http://api.fixer.io/latest?base=USD&symbols=AUD,BRL,CAD,CHF');
+            expect(spec.constructCurrencyUrl('USD'))
+                .toEqual('https://exchangeratesapi.io/api/latest?base=USD');
 
             expect(spec.constructCurrencyUrl()).toBeUndefined();
 
-            expect(spec.constructCurrencyUrl('', '')).toBeUndefined();
-            expect(spec.constructCurrencyUrl('USD', '')).toBeUndefined();
-            expect(spec.constructCurrencyUrl('', 'AUD,BRL,CAD,CHF')).toBeUndefined();
+            expect(spec.constructCurrencyUrl('')).toBeUndefined();
 
-            expect(spec.constructCurrencyUrl(undefined, 'AUD,BRL,CAD,CHF')).toBeUndefined();
-            expect(spec.constructCurrencyUrl('USD', undefined)).toBeUndefined();
-            expect(spec.constructCurrencyUrl(undefined, undefined)).toBeUndefined();
-
-            expect(spec.constructCurrencyUrl('USD', null)).toBeUndefined();
-            expect(spec.constructCurrencyUrl(null, 'AUD,BRL,CAD,CHF')).toBeUndefined();
-            expect(spec.constructCurrencyUrl(null, null)).toBeUndefined();
-
-            expect(spec.constructCurrencyUrl(23, 'USD')).toBeUndefined();
-            expect(spec.constructCurrencyUrl('USD', 342)).toBeUndefined();
         });
 
         test('createDocument', () => {
@@ -153,8 +139,8 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
         });
 
         test('requestCurrencyFile', () => {
-            // Mock http get and requestCurrencyFile callback
-            const httpGetSpy = jest.spyOn(http, 'get').mockImplementation((url, callback) => {
+            // Mock https get and requestCurrencyFile callback
+            const httpGetSpy = jest.spyOn(https, 'get').mockImplementation((url, callback) => {
                 callback(resp);
                 switch (url) {
                     case 'fileSuccess':
@@ -167,7 +153,7 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
                         resp.end();
                         break;
                     case 'fileError':
-                        resp.error(new Error('Error: http could not be parsed'));
+                        resp.error(new Error('Error: https could not be parsed'));
                         break;
                     case 'fileBroken':
                         resp.data('{');
