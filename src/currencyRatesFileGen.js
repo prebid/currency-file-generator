@@ -56,14 +56,16 @@ exports.handler = function(event, context) {
 
         // load currency json file from currency url
         requestCurrencyFile(currencyUrl, (json) => {
-            if (json !== null && typeof json === 'object') {
-                results.push(json);
-            }
-            else {
-                logError('Error: malformed json:', json);
-                // error, exit
-                return;
-            }
+	    // verify response data, json.rates should be an object with at least 20 keys (currencies)
+	    if (json !== null && typeof json === 'object') {
+	      if (json.base && json.date && typeof json.rates === 'object' && Object.keys(json.rates).length >= 20) {
+	        results.push(json);
+	       }
+	       else {
+	        logError('Error: json data failed validation:', json);
+	        return;
+	       }
+	    }
 
             // All results loaded when results count is equal to fromCurrencies count
             if (results.length === fromCurrencies.length) {
@@ -84,7 +86,10 @@ exports.handler = function(event, context) {
                 // upload json to S3 bucket at key
                 // context.done() is called on complete/error
                 uploadDocumentToS3(docParams, context);
-            }
+            } else {
+                logError('Error: did not receive responses for all fromCurrencies');
+                return;
+	    }
         });
     }
 };
