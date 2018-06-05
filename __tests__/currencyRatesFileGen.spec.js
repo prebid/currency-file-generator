@@ -108,10 +108,47 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             };
             // Mock Lambda handler context.done function
             const contextMock = {done: jest.fn()};
+            global.console.error = jest.fn();
 
-            // Integration test
+
+            // Integration tests
+
+            // check valid responses
             handler({}, contextMock);
             expect(contextMock.done).toBeCalledWith(null, JSON.stringify({filename: 'latest.json'}));
+
+            // check invalid responses
+            httpGetSpy.mockReset();
+            httpGetSpy.mockImplementation((url, callback) => {
+                callback(resp);
+                switch (url) {
+                    case 'https://exchangeratesapi.io/api/latest?base=USD':
+                        resp.data('{');
+                        resp.data('"base":"USD","date":"2018-02-26","rates":{"TRY":3.7808,"ZAR":11.593}');
+                        resp.data('}');
+                        resp.end();
+                        break;
+                    case 'https://exchangeratesapi.io/api/latest?base=GBP':
+                        resp.data('{');
+                        resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
+                        resp.data('}');
+                        resp.end();
+                        break;
+                    default:
+                        resp.error(new Error('Error loading url', url));
+                        break;
+                }
+            });
+            contextMock.done.mockReset();
+            global.console.error.mockReset();
+
+            handler({}, contextMock);
+            expect(contextMock.done).not.toBeCalled();
+            expect(global.console.error).toBeCalledWith("Error: did not receive responses for all fromCurrencies", undefined);
+            expect(global.console.error.mock.calls.length).toEqual(2);
+            expect(global.console.error.mock.calls[0]).toEqual(["Error: json data failed validation:", {"base": "USD", "date": "2018-02-26", "rates": {"TRY": 3.7808, "ZAR": 11.593}}]);
+            expect(global.console.error.mock.calls[1]).toEqual(["Error: did not receive responses for all fromCurrencies", undefined]);
+            global.console.error.mockRestore()
         });
     });
 
