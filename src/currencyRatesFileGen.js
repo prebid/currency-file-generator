@@ -1,12 +1,11 @@
 /**
- * @fileOverview Loads currency rates from api.fixer.io and creates and uploads a JSON representation to S3.
- * @version 0.0.1
+ * @fileOverview Loads currency rates from the European Central Bank and creates and uploads a JSON representation to S3.
+ * @version 1.1
  */
-const http = require('http');
+const https = require('https');
 const aws = require('aws-sdk');
 
 const fromCurrencies = ['USD', 'GBP'];
-const supportedCurrencies = 'AUD,BRL,CAD,CHF,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,MXN,MYR,NOK,NZD,PHP,PLN,RUB,SEK,SGD,THB,TRY,USD,ZAR';
 
 // when to expire for HTTP "Expires:" header (seconds)
 const expires = 24 * 3600 + 5;
@@ -48,7 +47,7 @@ exports.handler = function(event, context) {
 
     for (let fromCurrency of fromCurrencies) {
         /** @type {string|undefined} */
-        const currencyUrl = constructCurrencyUrl(fromCurrency, supportedCurrencies);
+        const currencyUrl = constructCurrencyUrl(fromCurrency);
         if (!currencyUrl) {
             logError('Error: malformed currencyUrl', currencyUrl);
             // error, exit
@@ -57,14 +56,16 @@ exports.handler = function(event, context) {
 
         // load currency json file from currency url
         requestCurrencyFile(currencyUrl, (json) => {
-            if (json !== null && typeof json === 'object') {
-                results.push(json);
-            }
-            else {
-                logError('Error: malformed json:', json);
-                // error, exit
-                return;
-            }
+	    // verify response data, json.rates should be an object with at least 20 keys (currencies)
+	    if (json !== null && typeof json === 'object') {
+	      if (json.base && json.date && typeof json.rates === 'object' && Object.keys(json.rates).length >= 20) {
+	        results.push(json);
+	       }
+	       else {
+	        logError('Error: json data failed validation:', json);
+	        return;
+	       }
+	    }
 
             // All results loaded when results count is equal to fromCurrencies count
             if (results.length === fromCurrencies.length) {
@@ -85,7 +86,10 @@ exports.handler = function(event, context) {
                 // upload json to S3 bucket at key
                 // context.done() is called on complete/error
                 uploadDocumentToS3(docParams, context);
-            }
+            } else {
+                logError('Error: did not receive responses for all fromCurrencies');
+                return;
+	    }
         });
     }
 };
@@ -123,19 +127,16 @@ function getExpiration(expires) {
 
 /**
  * @param {string} fromCurrency
- * @param {string} supportedCurrencies
  * @returns {string|undefined}
  */
-function constructCurrencyUrl(fromCurrency, supportedCurrencies) {
+function constructCurrencyUrl(fromCurrency) {
     if (typeof fromCurrency !== 'string' || fromCurrency === '') {
         logError('Error: invalid fromCurrency', fromCurrency + ' ' + Object.prototype.toString.call(fromCurrency));
         return undefined;
     }
-    if (typeof supportedCurrencies !== 'string' || supportedCurrencies === '') {
-        logError('Error: invalid supportedCurrencies', supportedCurrencies + ' ' + Object.prototype.toString.call(supportedCurrencies));
-        return undefined;
-    }
-    return 'http://api.fixer.io/latest?base=' + fromCurrency + '&symbols=' + supportedCurrencies;
+    return 'https://exchangeratesapi.io/api/latest?base=' + fromCurrency;
+    /* return 'http://api.fixer.io/latest?base=' + fromCurrency + '&symbols=' + supportedCurrencies; */
+    /* return 'http://data.fixer.io/api/latest?access_key=63f7c1535a9f1ad8714a62fd0bb2eb3e?base=' + fromCurrency + '&symbols=' + supportedCurrencies; */
 }
 
 /**
@@ -146,7 +147,7 @@ function constructCurrencyUrl(fromCurrency, supportedCurrencies) {
 function requestCurrencyFile(url, fileEndCallback) {
     log('requesting: ' + url);
 
-    return http.get(url, (res /** @type {http.IncomingMessage} */) => {
+    return https.get(url, (res /** @type {https.IncomingMessage} */) => {
         let body = '';
 
         // the 'data' event is emitted whenever the stream is relinquishing ownership of a chunk of data to the consumer
@@ -226,7 +227,7 @@ function createDocument(results) {
         conversions[results[cv].base] = results[cv].rates;
     }
     return {
-        'dataAsOf': new Date().toDateString().split('T')[0],
+        'dataAsOf': new Date().toISOString().split('T')[0],
         'conversions': conversions
     };
 }
