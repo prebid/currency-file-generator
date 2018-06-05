@@ -144,7 +144,6 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
 
             handler({}, contextMock);
             expect(contextMock.done).not.toBeCalled();
-            expect(global.console.error).toBeCalledWith("Error: did not receive responses for all fromCurrencies", undefined);
             expect(global.console.error.mock.calls.length).toEqual(2);
             expect(global.console.error.mock.calls[0]).toEqual(["Error: json data failed validation:", {"base": "USD", "date": "2018-02-26", "rates": {"TRY": 3.7808, "ZAR": 11.593}}]);
             expect(global.console.error.mock.calls[1]).toEqual(["Error: did not receive responses for all fromCurrencies", undefined]);

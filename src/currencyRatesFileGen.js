@@ -43,7 +43,6 @@ function getFilename() {
 exports.handler = function(event, context) {
     /** @type {Array.<Object>} - loaded and parsed json objects for currency */
     const results = [];
-    console.log('fromCurrencies', fromCurrencies);
 
     for (let fromCurrency of fromCurrencies) {
         /** @type {string|undefined} */
