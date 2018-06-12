@@ -135,8 +135,6 @@ function constructCurrencyUrl(fromCurrency) {
         return undefined;
     }
     return 'https://exchangeratesapi.io/api/latest?base=' + fromCurrency;
-    /* return 'http://api.fixer.io/latest?base=' + fromCurrency + '&symbols=' + supportedCurrencies; */
-    /* return 'http://data.fixer.io/api/latest?access_key=63f7c1535a9f1ad8714a62fd0bb2eb3e?base=' + fromCurrency + '&symbols=' + supportedCurrencies; */
 }
 
 /**
