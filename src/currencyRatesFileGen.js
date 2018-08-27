@@ -134,7 +134,7 @@ function constructCurrencyUrl(fromCurrency) {
         logError('Error: invalid fromCurrency', fromCurrency + ' ' + Object.prototype.toString.call(fromCurrency));
         return undefined;
     }
-    return 'https://exchangeratesapi.io/api/latest?base=' + fromCurrency;
+    return 'https://api.exchangeratesapi.io/latest?base=' + fromCurrency;
 }
 
 /**
