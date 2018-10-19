@@ -17,7 +17,7 @@ const repositoryName = 'currency-file'
 
 const fromCurrencies = ['USD', 'GBP'];
 // when to expire for HTTP "Expires:" header (seconds)
- const expires = 24 * 3600 + 5;
+const expires = 24 * 3600 + 5;
 
 /**
  *  env variable value if set or default
@@ -35,188 +35,159 @@ function getFilename() {
     return process.env.S3_FILENAME || 'latest-test.json';
 }
 
-
 /**
 * @returns {boolean} env variable value if set or default
 */
 function getDebug() {
-   return (typeof process.env.DEBUG !== 'undefined') ? (process.env.DEBUG === '1') : true;
+    return (typeof process.env.DEBUG !== 'undefined') ? (process.env.DEBUG === '1') : true;
 }
 
 // runs a git command
-function runCommand (commandString, options) {
-console.log("in runCommand: "+commandString);
-  const [command, ...args] = commandString.match(/(".*?")|(\S+)/g)
-  const cmd = spawnSync(command, args, options)
-console.log("after spawnsync: "+JSON.stringify(cmd));
-  const errorString = cmd.stderr.toString()
-  if (errorString) {
-    throw new Error(
-      `Git command failed
+function runCommand(commandString, options) {
+    // console.log("in runCommand: " + commandString);
+    const [command, ...args] = commandString.match(/(".*?")|(\S+)/g)
+    const cmd = spawnSync(command, args, options)
+    // console.log("after spawnsync: " + JSON.stringify(cmd));
+    const errorString = cmd.stderr.toString()
+    if (errorString) {
+        console.log('throwing error', errorString);
+        throw new Error(
+            `Git command failed
       ${commandString}
       ${errorString}`
-    )
-  }
+        )
+    }
 }
 
 // gets the current git version and increments the third level
 function incGitTag() {
-   var result=spawnSync('git', ['describe','--abbrev=0', '--tags'], {stdio: 'pipe'} );
-   var errorString = result.stderr.toString()
-   if (errorString) {
-	logError("incGitTag error: "+errorString);
-	return(-1);
-   }
-   var output=result.stdout.toString();
-   if (output && output != "") {
-	console.log("incGitTag output: "+output);
+    var result = spawnSync('git', ['describe', '--abbrev=0', '--tags'], { stdio: 'pipe' });
+    var errorString = result.stderr.toString()
+    if (errorString) {
+        logError("incGitTag error: " + errorString);
+        return (-1);
+    }
+    var output = result.stdout.toString();
+    if (output && output != "") {
+        // console.log("incGitTag output: " + output);
         var versionArray;
-	versionArray=output.split(".");
-	if (versionArray.length != 3 ) {
-	   logError("invalid version: "+version);
-	   return(-1);
-	}
-	var version3=parseInt(versionArray[2]);
-	if (isNaN(version3)) {
-	   logError("invalid version: "+version);
-	   return(-1);
-	}
-	var newVersion=versionArray[0]+"."+versionArray[1]+"."+(version3+1);
+        versionArray = output.split(".");
+        if (versionArray.length != 3) {
+            logError("invalid version: " + version);
+            return (-1);
+        }
+        var version3 = parseInt(versionArray[2]);
+        if (isNaN(version3)) {
+            logError("invalid version: " + version);
+            return (-1);
+        }
+        console.log('NEW VERSION');
 
-	// write tag
-	result=spawnSync('git', ['tag', newVersion]);
-   	var errorString = result.stderr.toString()
-   	if (errorString) {
-	    logError("git tag error: "+errorString);
-	    return(-1);
-   	}
-	console.log("version updated to "+newVersion);
-   } else {
-	logError("git describe output was invalid");
-	return(-1);
-   }
+        var newVersion = versionArray[0] + "." + versionArray[1] + "." + (version3 + 1);
+        console.log(newVersion);
+        // write tag
+        result = spawnSync('git', ['tag', newVersion]);
+        var errorString = result.stderr.toString()
+        if (errorString) {
+            logError("git tag error: " + errorString);
+            return (-1);
+        }
+        console.log("version updated to " + newVersion);
+    } else {
+        logError("git describe output was invalid");
+        return (-1);
+    }
 }
 
 module.exports.downloadPublish = async function (event, context, callback) {
-  process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
+    process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
 
-  // install git binary
-  await require('lambda-git')()
+    // install git binary
+    await require('lambda-git')()
 
-  // first try to get the data from the source
+    // first try to get the data from the source
 
-  /** @type {Array.<Object>} - loaded and parsed json objects for currency */
-  const results = [];
-  console.log('fromCurrencies', fromCurrencies);
-  var gotAllResponses=false;
-  for (let fromCurrency of fromCurrencies) {
-        const currencyUrl = constructCurrencyUrl(fromCurrency);
-        if (!currencyUrl) {
-            logError('Error: malformed currencyUrl', currencyUrl);
-            // error, exit
-            callback(null, 'bye');
-        }
+    /** @type {Array.<Object>} - loaded and parsed json objects for currency */
+    //console.log('fromCurrencies', fromCurrencies);
+    const urls = [];
+    fromCurrencies.forEach((fromCurrency)=> urls.push(constructCurrencyUrl(fromCurrency)));
+    let responses;
+    try{
+        responses = await fetchMultipleUrlsAsPromise(urls);
+    }
+    catch(e){
+        context.fail(e);
+        return;
+    }
 
-        // load currency json file from currency url
-        requestCurrencyFile(currencyUrl, (json) => {
-	    // verify response data, json.rates should be an object with at least 20 keys (currencies)
-	    if (json !== null && typeof json === 'object') {
-	      if (json.base && json.date && typeof json.rates === 'object' && Object.keys(json.rates).length >= 20) {
-	        results.push(json);
-	       }
-	       else {
-	        logError('Error: json data failed validation:', json);
-	        callback(null, 'bye');
-	       }
-	    }
+    const expiration = getExpiration(expires);
+    if (!expiration) {
+        logError(`Error: malformed expiration date: ${expiration}`, context);
+        return;
+    }
 
-console.log("got response #"+results.length+" from currency "+currencyUrl);
+    const newDocument = createDocument(responses);
 
-            // All results loaded when results count is equal to fromCurrencies count
-            if (results.length === fromCurrencies.length && gotAllResponses===false) {
-		gotAllResponses=true; // this is getting called twice for some reason
-                const expiration = getExpiration(expires);
-                if (!expiration) {
-                    logError('Error: malformed expiration date:', expiration);
-                    // error, exit
-                    callback(null, 'bye');
-                }
+    // for a transition period we send to github and then write to S3
+    if (pushToGithub(newDocument) < 0) {
+        logError("failure pushing to github", context);
+        return;
+    }
 
-		const newDocument=createDocument(results);
-console.log("response handler thinks we're done. results: "+JSON.stringify(newDocument));
+    const docParams = createDocumentParams(getBucket(), getFilename(), newDocument, expiration);
+    if (!docParams) {
+        const error = 'Error: malformed docParams:';
+        logError(error, context);
+        return;
+    }
+    // upload json to S3 bucket at key
+    // context.done() is called on complete/error
+    uploadDocumentToS3(docParams, context);
 
-		// for a transition period we send to github and then write to S3
-		if (pushToGithub(newDocument)<0) {
-		    logError("failure pushing to github");
-		    callback(null, 'bye');
-		}
-
-                const docParams = createDocumentParams(getBucket(), getFilename(), newDocument, expiration);
-                if (!docParams) {
-                    logError('Error: malformed docParams:', docParams);
-                    // error, exit
-                    callback(null, 'bye');
-                }
-
-                // upload json to S3 bucket at key
-                // context.done() is called on complete/error
-                uploadDocumentToS3(docParams, context);
-
-            } else {
-                console.log('Loaded '+fromCurrency);
-	    }
-        });
-  }
-  callback(null, 'bye');
+    return "success";
 }
 
-// pushToGitHub
-//
-// clone the repo
-// overwrite the latest.json file
-// update the version  (is this needed?)
-// commit the changes
-//
 // Based on https://gist.github.com/Loopiezlol/e00c35b0166b4eae891ec6b8d610f83c
+// TODO clean up and add tests
 function pushToGithub(newDocument) {
 
-  // now push the file up to git
-  // change the cwd to /tmp
-  process.chdir('/tmp')
-  // clone the repository and set it as the cwd
-  runCommand(`git clone --quiet https://${gitRepositoryURL}`)
-  process.chdir(path.join(process.cwd(), repositoryName))
+    // now push the file up to git
+    // change the cwd to /tmp
+    process.chdir('/tmp')
+    // clone the repository and set it as the cwd
+    runCommand(`git clone --quiet https://${gitRepositoryURL}`);
+    process.chdir(path.join(process.cwd(), repositoryName))
+    runCommand(`git pull`);
+    // update local file
+    fs.writeFileSync('latest.json', JSON.stringify(newDocument));
 
-  // update local file
-  fs.writeFileSync('latest.json', JSON.stringify(newDocument));
-
-  // update local git config with email and username (required)
-  runCommand(`git config --local user.email ${GITHUB_EMAIL}`)
-  runCommand(`git config --local user.name ${GITHUB_USERNAME}`)
-  // stage local files
-  runCommand('git add .')
-  // commit changes
-  runCommand('git commit -m "commit by :robot:"')
-  if (incGitTag() < 0) {
-     logError("incGitTag failed");
-     return(-1);
-  }
-  // replace the remote with an authenticated one
-  runCommand('git remote rm origin')
-  runCommand(
-    `git remote add origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${gitRepositoryURL}`
-  )
-  // push changes to remote
-  runCommand('git push --porcelain --set-upstream origin master')
-  runCommand('git push --porcelain origin --tags')
-  return(0);
+    // update local git config with email and username (required)
+    runCommand(`git config --local user.email ${GITHUB_EMAIL}`)
+    runCommand(`git config --local user.name ${GITHUB_USERNAME}`)
+    // stage local files
+    runCommand('git add .')
+    // commit changes
+    runCommand('git commit -m "commit by :robot:"')
+    if (incGitTag() < 0) {
+        logError("incGitTag failed");
+        return (-1);
+    }
+    // replace the remote with an authenticated one
+    runCommand('git remote rm origin')
+    runCommand(
+        `git remote add origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${gitRepositoryURL}`
+    )
+    // push changes to remote
+    runCommand('git push --porcelain --set-upstream origin master')
+    runCommand('git push --porcelain origin --tags')
+    return (0);
 }
 
-  // TODO - clear jsdelivr cache
-  // Purge cache
-  // jsDelivr has an easy to use API to purge files from the cache and force the files to update. This is useful when you release a new version and want to force the update of all version aliased users.
-  //
-  // To avoid abuse, access to purge is given after an email request (for now - dak@prospectone.io).
+// TODO - clear jsdelivr cache
+// Purge cache
+// jsDelivr has an easy to use API to purge files from the cache and force the files to update. This is useful when you release a new version and want to force the update of all version aliased users.
+//
+// To avoid abuse, access to purge is given after an email request (for now - dak@prospectone.io).
 
 
 /**
@@ -245,6 +216,7 @@ function constructCurrencyUrl(fromCurrency) {
  * @param {string} url
  * @param {function} fileEndCallback
  * @returns {http.ClientRequest}
+ * TODO: add promise style rejections. 
  */
 function requestCurrencyFile(url, fileEndCallback) {
     log('requesting: ' + url);
@@ -304,11 +276,14 @@ function log(line) {
 }
 
 /**
- * @param {*} line
- * @param {*} error
+ * @param {String} error
+ * @param {Object} Context
  */
-function logError(line, error) {
-    console.error(line, error);
+function logError(error, context) {
+    console.error(error);
+    if(typeof context === 'object') {
+        context.fail(error);
+    }
 }
 
 /**
@@ -324,7 +299,7 @@ function logError(line, error) {
  */
 function uploadDocumentToS3(params, context) {
     if (params === null || typeof params !== 'object') {
-        logError('Error: invalid params argument passed to uploadDocumentToS3', params);
+        logError(`Error: invalid params argument passed to uploadDocumentToS3: ${params}`, context);
         return;
     }
     if (context === null || typeof context !== 'object' || !context.hasOwnProperty('done') || typeof context.done !== 'function') {
@@ -340,10 +315,10 @@ function uploadDocumentToS3(params, context) {
     return s3.upload(params, (e, data) => {
         if (e) {
             logError(e.lineNumber, e.message);
-            context.done(null, JSON.stringify({filename: params.Key, error: data}));
+            context.done(null, JSON.stringify({ filename: params.Key, error: data }));
         } else {
             log('rates pushed to s3: ' + params.Bucket + ' ' + params.Key);
-            context.done(null, JSON.stringify({filename: params.Key}));
+            context.done(null, JSON.stringify({ filename: params.Key }));
         }
     });
 }
@@ -366,6 +341,28 @@ function createDocumentParams(bucket, filename, documentObj, expires) {
             Body: JSON.stringify(documentObj),
             Expires: expires
         }
+    }
+}
+
+async function fetchMultipleUrlsAsPromise(fetchUrls){
+    const responses = [];
+    for (let url of fetchUrls) {
+        const promise = new Promise((resolve, reject) => {
+            requestCurrencyFile(url, resolve);
+        });
+        const data = await promise;
+        validateCurrencyData(data);
+        responses.push(data);
+    }
+    return responses;
+}
+
+function validateCurrencyData(json) {
+    if(!json || typeof json !== 'object') {
+        throw new Error(`Error: json data failed validation`);
+    }
+    if (!json.base || !json.date || typeof json.rates !== 'object' || Object.keys(json.rates).length < 20) {
+        throw new Error(`Error: json data failed validation: ${json}`);
     }
 }
 
