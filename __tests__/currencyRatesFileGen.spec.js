@@ -155,7 +155,7 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
     describe('Unit Tests', () => {
         test('constructCurrencyUrl', () => {
             expect(spec.constructCurrencyUrl('USD'))
-                .toEqual('https://exchangeratesapi.io/api/latest?base=USD');
+                .toEqual('https://api.exchangeratesapi.io/api/latest?base=USD');
 
             expect(spec.constructCurrencyUrl()).toBeUndefined();
 
