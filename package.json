@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Loads currency rates from api.fixer.io and creates a JSON representation in S3.",
   "scripts": {
-    "test": "jest \"__tests__/[a-zA-Z_0-9\\-\\.]{1,}spec\\.js$\""
+    "test": "jest --coverage \"__tests__/[a-zA-Z_0-9\\-\\.]{1,}spec\\.js$\""
   },
   "repository": {
     "type": "git",
