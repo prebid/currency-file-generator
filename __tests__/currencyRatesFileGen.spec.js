@@ -1,4 +1,6 @@
 const https = require('https');
+let ajax = require('../src/ajax.js'); 
+ajax.requestJSONData = jest.fn();
 
 // mock aws-sdk
 jest.mock('aws-sdk', () => {
@@ -27,40 +29,17 @@ jest.mock('aws-sdk', () => {
 const aws = require('aws-sdk');
 const {spec, downloadPublish} = require('../src/currencyRatesFileGen');
 
-// Mock for https.get callback argument: response
-const resp = {
-    eventHandlers: {},
-    data(chunk) {
-        return (resp.eventHandlers['data']) ? resp.eventHandlers['data'](chunk) : function(chunk) {
-            throw Error('on.data downloadPublish does not exist:', chunk);
-        };
-    },
-    end() {
-        return (resp.eventHandlers['end']) ? resp.eventHandlers['end']() : function() {
-            throw Error('on.end downloadPublish does not exist');
-        };
-    },
-    error(e) {
-        return (resp.eventHandlers['error']) ? resp.eventHandlers['error'](e) : function(e) {
-            throw Error('on.error downloadPublish does not exist', e);
-        };
-    },
-    on(eventType, downloadPublish) {
-        resp.eventHandlers[eventType] = downloadPublish;
-    },
-    reset() {
-        Object.keys(resp.eventHandlers).forEach(key => {
-            resp.eventHandlers[key] = undefined;
-        });
-    }
-};
-
 // Helper Constants
 const SECONDS_IN_MINUTE = 60;
 const SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE;
 const SECONDS_IN_DAY = SECONDS_IN_HOUR * 24;
 // Mon Jan 01 2018 12:30:40 GMT-0800 (PST)
 const TIME_IN_MS_JAN_1_2018 = 1514838640000;
+// Mock Lambda downloadPublish context.done function
+const contextMock = {
+    done: jest.fn(),
+    fail: jest.fn()
+};
 
 describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful operations`, () => {
     beforeAll(() => {
@@ -69,7 +48,7 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
     });
 
     beforeEach(() => {
-        resp.reset();
+        //resp.reset();
         jest.resetAllMocks()
     });
 
@@ -175,54 +154,7 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             expect(doc['conversions']).toEqual({"1.5": [4, 65, 90], "30.2": [2, 4, 65, 90, 23]});
         });
 
-        test('requestCurrencyFile', () => {
-            // Mock https get and requestCurrencyFile callback
-            const httpGetSpy = jest.spyOn(https, 'get').mockImplementation((url, callback) => {
-                callback(resp);
-                switch (url) {
-                    case 'fileSuccess':
-                        resp.data('{');
-                        resp.data('"body":"content"');
-                        resp.data('}');
-                        resp.end();
-                        break;
-                    case 'fileEnd':
-                        resp.end();
-                        break;
-                    case 'fileError':
-                        resp.error(new Error('Error: https could not be parsed'));
-                        break;
-                    case 'fileBroken':
-                        resp.data('{');
-                        resp.data('"body":"content"');
-                        resp.end();
-                        break;
-                }
-            });
-            const mockRequestCurrencyFileCallback = jest.fn();
-
-            spec.requestCurrencyFile('fileSuccess', mockRequestCurrencyFileCallback);
-            expect(mockRequestCurrencyFileCallback).toBeCalledWith({body: 'content'});
-
-            spec.requestCurrencyFile('fileEnd', mockRequestCurrencyFileCallback);
-            expect(mockRequestCurrencyFileCallback).toBeCalledWith(undefined);
-
-            spec.requestCurrencyFile('fileError', mockRequestCurrencyFileCallback);
-            expect(mockRequestCurrencyFileCallback).toBeCalledWith(undefined);
-
-            spec.requestCurrencyFile('fileBroken', mockRequestCurrencyFileCallback);
-            expect(mockRequestCurrencyFileCallback).toBeCalledWith(undefined);
-
-            httpGetSpy.mockRestore();
-        });
-
         test('uploadDocumentToS3', () => {
-            // Mock Lambda downloadPublish context.done function
-            const contextMock = {
-                done: jest.fn(),
-                fail: jest.fn()
-            };
-
             const docParams = {
                 Bucket: 'bucket1',
                 Key: 'file1',
@@ -377,6 +309,15 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             spec.logError('line', {});
             expect(global.console.error).toBeCalledWith('line');
             
+        });
+        
+        test('purgeCache', async () => {
+            const response = {"someKey": "someData"};
+            ajax.requestJSONData.mockImplementation((url, accept, reject) =>{
+                accept(response);
+            });
+            await spec.purgeCache('http://purge-url.com', contextMock);
+            expect(global.console.log).toBeCalledWith('successfully purged cache', response);
         });
     });
 });

@@ -9,12 +9,13 @@ const fs = require('fs')
 const path = require('path')
 const process = require('process')
 const { spawnSync } = require('child_process')
+const { requestJSONData } = require('./ajax.js');
 
-const { GITHUB_TOKEN, GITHUB_USERNAME, GITHUB_EMAIL } = process.env
+const { GITHUB_TOKEN, GITHUB_USERNAME, GITHUB_EMAIL } = process.env;
 // leaving this without https:// in order to reuse it when adding the remote
-const gitRepositoryURL = 'github.com/prebid/currency-file.git'
-const repositoryName = 'currency-file'
-
+const gitRepositoryURL = 'github.com/prebid/currency-file.git';
+const repositoryName = 'currency-file';
+const PURGE_URL = 'https://purge.jsdelivr.net/gh/prebid/currency-file@1/latest.json';
 const fromCurrencies = ['USD', 'GBP'];
 // when to expire for HTTP "Expires:" header (seconds)
 const expires = 24 * 3600 + 5;
@@ -144,8 +145,9 @@ module.exports.downloadPublish = async function (event, context, callback) {
         return;
     }
     // upload json to S3 bucket at key
-    // context.done() is called on complete/error
     uploadDocumentToS3(docParams, context);
+
+    await purgeCache(PURGE_URL, context);
 
     return "success";
 }
@@ -186,12 +188,6 @@ function pushToGithub(newDocument) {
     return (0);
 }
 
-// TODO - clear jsdelivr cache
-// Purge cache
-// jsDelivr has an easy to use API to purge files from the cache and force the files to update. This is useful when you release a new version and want to force the update of all version aliased users.
-//
-// To avoid abuse, access to purge is given after an email request (for now - dak@prospectone.io).
-
 
 /**
  * @param {number} expires - when to expire for HTTP "Expires:" header (seconds)
@@ -215,46 +211,46 @@ function constructCurrencyUrl(fromCurrency) {
     return 'https://api.exchangeratesapi.io/latest?base=' + fromCurrency;
 }
 
-/**
- * @param {string} url
- * @param {function} fileEndCallback
- * @returns {http.ClientRequest}
- * TODO: add promise style rejections. 
- */
-function requestCurrencyFile(url, fileEndCallback) {
-    log('requesting: ' + url);
+// /**
+//  * @param {string} url
+//  * @param {function} fileEndCallback
+//  * @returns {http.ClientRequest}
+//  * TODO: add promise style rejections. 
+//  */
+// function requestCurrencyFile(url, fileEndCallback) {
+//     log('requesting: ' + url);
 
-    return https.get(url, (res /** @type {https.IncomingMessage} */) => {
-        let body = '';
+//     return https.get(url, (res /** @type {https.IncomingMessage} */) => {
+//         let body = '';
 
-        // the 'data' event is emitted whenever the stream is relinquishing ownership of a chunk of data to the consumer
-        res.on('data', (chunk) => {
-            body += chunk;
-        });
+//         // the 'data' event is emitted whenever the stream is relinquishing ownership of a chunk of data to the consumer
+//         res.on('data', (chunk) => {
+//             body += chunk;
+//         });
 
-        // the 'error' event emits if the stream is unable to generate data due to internal failure or from an invalid chunk of data
-        res.on('error', (e) => {
-            logError(e.message);
-            fileEndCallback(undefined);
-        });
+//         // the 'error' event emits if the stream is unable to generate data due to internal failure or from an invalid chunk of data
+//         res.on('error', (e) => {
+//             logError(e.message);
+//             fileEndCallback(undefined);
+//         });
 
-        // The 'end' event is emitted after all data has been output.
-        res.on('end', () => {
-            if (body === '') {
-                logError('Error: response body is empty');
-                fileEndCallback(undefined);
-            }
-            try {
-                const json = JSON.parse(body);
-                fileEndCallback(json);
-            }
-            catch (e) {
-                logError(e.message, body);
-                fileEndCallback(undefined);
-            }
-        });
-    });
-}
+//         // The 'end' event is emitted after all data has been output.
+//         res.on('end', () => {
+//             if (body === '') {
+//                 logError('Error: response body is empty');
+//                 fileEndCallback(undefined);
+//             }
+//             try {
+//                 const json = JSON.parse(body);
+//                 fileEndCallback(json);
+//             }
+//             catch (e) {
+//                 logError(e.message, body);
+//                 fileEndCallback(undefined);
+//             }
+//         });
+//     });
+// }
 
 /**
  * @param {Array.<Object>} results
@@ -266,7 +262,7 @@ function createDocument(results) {
         conversions[results[cv].base] = results[cv].rates;
     }
     return {
-        'dataAsOf': new Date().toISOString().split('T')[0],
+        'dataAsOf': new Date().toISOString(),
         'conversions': conversions
     };
 }
@@ -351,7 +347,7 @@ async function fetchMultipleUrlsAsPromise(fetchUrls){
     const responses = [];
     for (let url of fetchUrls) {
         const promise = new Promise((resolve, reject) => {
-            requestCurrencyFile(url, resolve);
+            requestJSONData(url, resolve, reject);
         });
         const data = await promise;
         validateCurrencyData(data);
@@ -369,6 +365,20 @@ function validateCurrencyData(json) {
     }
 }
 
+async function purgeCache(url, context) {
+
+    const promise = new Promise((resolve, reject) => {
+        requestJSONData(url, resolve, reject);
+    });
+    const data = await promise;
+    if(data) {
+        console.log('successfully purged cache', data);
+    }
+    else{
+        logError('error purging cache', context);
+    }
+}
+
 /**
  * Export internal functions for testing
  */
@@ -377,7 +387,6 @@ exports.spec = {
     log,
     logError,
     constructCurrencyUrl,
-    requestCurrencyFile,
     pushToGithub,
     getExpiration,
     createDocument,
@@ -386,5 +395,6 @@ exports.spec = {
     uploadDocumentToS3,
     getFilename,
     getBucket,
-    createDocumentParams
+    createDocumentParams,
+    purgeCache
 };
