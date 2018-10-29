@@ -5,10 +5,9 @@
 'use strict';
 const https = require('https');
 const aws = require('aws-sdk');
-const fs = require('fs')
-const path = require('path')
-const process = require('process')
-const { spawnSync } = require('child_process')
+const fs = require('fs');
+const path = require('path');
+const process = require('process');
 const { requestJSONData } = require('./ajax.js');
 const { runCommand } = require('./shell.js');
 
@@ -47,45 +46,33 @@ function getDebug() {
 
 // gets the current git version and increments the third level
 function incGitTag() {
-    var result = spawnSync('git', ['describe', '--abbrev=0', '--tags'], { stdio: 'pipe' });
-    var errorString = result.stderr.toString()
-    if (errorString) {
-        logError("incGitTag error: " + errorString);
-        return (-1);
-    }
-    var output = result.stdout.toString();
+    let output = runCommand('git describe --abbrev=0 --tags', { stdio: 'pipe' });
+    // var errorString = result.stderr.toString()
+    // if (errorString) {
+    //     logError("incGitTag error: " + errorString);
+    //     return (-1);
+    // }
     if (output && output != "") {
-        // console.log("incGitTag output: " + output);
-        var versionArray;
+        let versionArray;
         versionArray = output.split(".");
         if (versionArray.length != 3) {
             logError("invalid version: " + version);
-            return (-1);
         }
         var version3 = parseInt(versionArray[2]);
         if (isNaN(version3)) {
             logError("invalid version: " + version);
-            return (-1);
         }
-        console.log('NEW VERSION');
-
         var newVersion = versionArray[0] + "." + versionArray[1] + "." + (version3 + 1);
-        console.log(newVersion);
+        console.log('new tag version', newVersion);
         // write tag
-        result = spawnSync('git', ['tag', newVersion]);
-        var errorString = result.stderr.toString()
-        if (errorString) {
-            logError("git tag error: " + errorString);
-            return (-1);
-        }
+        output = runCommand(`git tag ${newVersion}`);
         console.log("version updated to " + newVersion);
     } else {
         logError("git describe output was invalid");
-        return (-1);
     }
 }
-
-module.exports.downloadPublish = async function (event, context, callback) {
+ 
+async function downloadPublish (event, context, callback) {
     process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
     debugger;
     // install git binary
@@ -134,6 +121,8 @@ module.exports.downloadPublish = async function (event, context, callback) {
     
     return "success";
 }
+
+module.exports.downloadPublish = downloadPublish;
 
 // Based on https://gist.github.com/Loopiezlol/e00c35b0166b4eae891ec6b8d610f83c
 // TODO clean up and add tests
@@ -332,11 +321,11 @@ exports.spec = {
     pushToGithub,
     getExpiration,
     createDocument,
-    runCommand,
     incGitTag,
     uploadDocumentToS3,
     getFilename,
     getBucket,
     createDocumentParams,
-    purgeCache
+    purgeCache,
+    downloadPublish
 };
