@@ -1,6 +1,7 @@
 
 const https = require('https');
 let shell = require('../src/shell.js');
+let process = require('process');
 const TIME_IN_MS_JAN_1_2018 = 1514838640000;
 
 const contextMock = {
@@ -10,6 +11,10 @@ const contextMock = {
 
 shell.runCommand = jest.fn().mockImplementation((cmd)=>{
     console.log('running command: ', cmd);
+});
+
+process.chdir = jest.fn().mockImplementation((dir) => {
+    console.log('switching directory', dir);
 });
 
 jest.mock('aws-sdk', () => {
