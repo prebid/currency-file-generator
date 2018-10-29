@@ -47,11 +47,6 @@ function getDebug() {
 // gets the current git version and increments the third level
 function incGitTag() {
     let output = runCommand('git describe --abbrev=0 --tags', { stdio: 'pipe' });
-    // var errorString = result.stderr.toString()
-    // if (errorString) {
-    //     logError("incGitTag error: " + errorString);
-    //     return (-1);
-    // }
     if (output && output != "") {
         let versionArray;
         versionArray = output.split(".");
@@ -81,7 +76,6 @@ async function downloadPublish (event, context, callback) {
     // first try to get the data from the source
 
     /** @type {Array.<Object>} - loaded and parsed json objects for currency */
-    //console.log('fromCurrencies', fromCurrencies);
     const urls = [];
     fromCurrencies.forEach((fromCurrency)=> urls.push(constructCurrencyUrl(fromCurrency)));
     let responses;
@@ -125,9 +119,7 @@ async function downloadPublish (event, context, callback) {
 module.exports.downloadPublish = downloadPublish;
 
 // Based on https://gist.github.com/Loopiezlol/e00c35b0166b4eae891ec6b8d610f83c
-// TODO clean up and add tests
 function pushToGithub(newDocument) {
-
     // now push the file up to git
     // change the cwd to /tmp
     process.chdir('/tmp')
@@ -151,9 +143,7 @@ function pushToGithub(newDocument) {
     }
     // replace the remote with an authenticated one
     runCommand('git remote rm origin')
-    runCommand(
-        `git remote add origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${gitRepositoryURL}`
-    )
+    runCommand(`git remote add origin https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${gitRepositoryURL}`);
     // push changes to remote
     runCommand('git push --porcelain --set-upstream origin master')
     runCommand('git push --porcelain origin --tags')

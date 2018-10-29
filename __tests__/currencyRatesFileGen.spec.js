@@ -235,15 +235,14 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
             
         });
         
-        // test('purgeCache', async () => {
-        //     ajax.requestJSONData = jest.fn();
-        //     const response = {"someKey": "someData"};
-        //     ajax.requestJSONData.mockImplementation((url, accept, reject) =>{
-        //         accept(response);
-        //     });
-        //     await spec.purgeCache('http://purge-url.com', contextMock);
-        //     expect(global.console.log).toBeCalledWith('successfully purged cache', response);
-        //     ajax.requestJSONData.mockRestore();
-        // });
+        test('purgeCache', async () => {
+            const response = {"someKey": "someData"};
+            ajax.requestJSONData.mockImplementation((url, accept, reject) =>{
+                accept(response);
+            });
+            await spec.purgeCache('http://purge-url.com', contextMock);
+            expect(global.console.log).toBeCalledWith('successfully purged cache', response);
+            ajax.requestJSONData.mockRestore();
+        });
     });
 });
