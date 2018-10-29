@@ -10,6 +10,7 @@ const path = require('path')
 const process = require('process')
 const { spawnSync } = require('child_process')
 const { requestJSONData } = require('./ajax.js');
+const { runCommand } = require('./shell.js');
 
 const { GITHUB_TOKEN, GITHUB_USERNAME, GITHUB_EMAIL } = process.env;
 // leaving this without https:// in order to reuse it when adding the remote
@@ -43,26 +44,6 @@ function getDebug() {
     return (typeof process.env.DEBUG !== 'undefined') ? (process.env.DEBUG === '1') : true;
 }
 
-
-/**
- * runs a command line function
- * 
- * @param {any} commandString 
- * @param {any} options 
- */
-function runCommand(commandString, options) {
-    const [command, ...args] = commandString.match(/(".*?")|(\S+)/g)
-    const cmd = spawnSync(command, args, options)
-    const errorString = cmd.stderr.toString()
-    if (errorString) {
-        console.log('throwing error', errorString);
-        throw new Error(
-            `Git command failed
-      ${commandString}
-      ${errorString}`
-        )
-    }
-}
 
 // gets the current git version and increments the third level
 function incGitTag() {
@@ -106,7 +87,7 @@ function incGitTag() {
 
 module.exports.downloadPublish = async function (event, context, callback) {
     process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
-
+    debugger;
     // install git binary
     await require('lambda-git')()
 
@@ -145,10 +126,12 @@ module.exports.downloadPublish = async function (event, context, callback) {
         return;
     }
     // upload json to S3 bucket at key
+    console.log('awaiting upload');
     uploadDocumentToS3(docParams, context);
-
+    
+    console.log('awaiting purge');
     await purgeCache(PURGE_URL, context);
-
+    
     return "success";
 }
 
@@ -210,47 +193,6 @@ function constructCurrencyUrl(fromCurrency) {
     }
     return 'https://api.exchangeratesapi.io/latest?base=' + fromCurrency;
 }
-
-// /**
-//  * @param {string} url
-//  * @param {function} fileEndCallback
-//  * @returns {http.ClientRequest}
-//  * TODO: add promise style rejections. 
-//  */
-// function requestCurrencyFile(url, fileEndCallback) {
-//     log('requesting: ' + url);
-
-//     return https.get(url, (res /** @type {https.IncomingMessage} */) => {
-//         let body = '';
-
-//         // the 'data' event is emitted whenever the stream is relinquishing ownership of a chunk of data to the consumer
-//         res.on('data', (chunk) => {
-//             body += chunk;
-//         });
-
-//         // the 'error' event emits if the stream is unable to generate data due to internal failure or from an invalid chunk of data
-//         res.on('error', (e) => {
-//             logError(e.message);
-//             fileEndCallback(undefined);
-//         });
-
-//         // The 'end' event is emitted after all data has been output.
-//         res.on('end', () => {
-//             if (body === '') {
-//                 logError('Error: response body is empty');
-//                 fileEndCallback(undefined);
-//             }
-//             try {
-//                 const json = JSON.parse(body);
-//                 fileEndCallback(json);
-//             }
-//             catch (e) {
-//                 logError(e.message, body);
-//                 fileEndCallback(undefined);
-//             }
-//         });
-//     });
-// }
 
 /**
  * @param {Array.<Object>} results

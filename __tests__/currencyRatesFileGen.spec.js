@@ -1,6 +1,6 @@
 const https = require('https');
 let ajax = require('../src/ajax.js'); 
-ajax.requestJSONData = jest.fn();
+let shell = require('../src/shell.js');
 
 // mock aws-sdk
 jest.mock('aws-sdk', () => {
@@ -26,6 +26,33 @@ jest.mock('aws-sdk', () => {
     }
 });
 
+const resp = {
+    eventHandlers: {},
+    data(chunk) {
+        return (resp.eventHandlers['data']) ? resp.eventHandlers['data'](chunk) : function(chunk) {
+            throw Error('on.data downloadPublish does not exist:', chunk);
+        };
+    },
+    end() {
+        return (resp.eventHandlers['end']) ? resp.eventHandlers['end']() : function() {
+            throw Error('on.end downloadPublish does not exist');
+        };
+    },
+    error(e) {
+        return (resp.eventHandlers['error']) ? resp.eventHandlers['error'](e) : function(e) {
+            throw Error('on.error downloadPublish does not exist', e);
+        };
+    },
+    on(eventType, downloadPublish) {
+        resp.eventHandlers[eventType] = downloadPublish;
+    },
+    reset() {
+        Object.keys(resp.eventHandlers).forEach(key => {
+            resp.eventHandlers[key] = undefined;
+        });
+    }
+};
+
 const aws = require('aws-sdk');
 const {spec, downloadPublish} = require('../src/currencyRatesFileGen');
 
@@ -49,86 +76,98 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
 
     beforeEach(() => {
         //resp.reset();
-        jest.resetAllMocks()
+        jest.resetAllMocks();
+        jest.resetModules();
     });
 
     describe('Integration tests', () => {
-        // test('downloadPublish', () => {
-        //     // Mock Date.prototype.getTime used by getExpiration method
-        //     const dateGetTimeSpy = jest.spyOn(global.Date.prototype, 'getTime').mockImplementation(() => {
-        //         return TIME_IN_MS_JAN_1_2018;
-        //     });
-        //     // Mock https get
-        //     const httpGetSpy = jest.spyOn(https, 'get').mockImplementation((url, callback) => {
-        //         callback(resp);
-        //         switch (url) {
-        //             case 'https://api.exchangeratesapi.io/latest?base=USD':
-        //                 resp.data('{');
-        //                 resp.data('"base":"USD","date":"2018-02-26","rates":{"AUD":1.2752,"BRL":3.2351,"CAD":1.2676,"CHF":0.93588,"CNY":6.3087,"CZK":20.61,"DKK":6.0438,"EUR":0.81169,"GBP":0.71282,"HKD":7.8236,"HUF":254.54,"IDR":13664.0,"ILS":3.493,"INR":64.775,"JPY":106.82,"KRW":1071.6,"MXN":18.602,"MYR":3.9095,"NOK":7.8168,"NZD":1.3675,"PHP":51.896,"PLN":3.3845,"RUB":55.958,"SEK":8.1526,"SGD":1.3171,"THB":31.32,"TRY":3.7808,"ZAR":11.593}');
-        //                 resp.data('}');
-        //                 resp.end();
-        //                 break;
-        //             case 'https://api.exchangeratesapi.io/latest?base=GBP':
-        //                 resp.data('{');
-        //                 resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
-        //                 resp.data('}');
-        //                 resp.end();
-        //                 break;
-        //             default:
-        //                 resp.error(new Error('Error loading url', url));
-        //                 break;
-        //         }
-        //     });
-        //     // Mock S3.upload callback
-        //     aws.mocks.s3UploadResult = function successUploadResult(params, callback) {
-        //         callback(undefined, {
-        //             filename: 'latest.json'
-        //         });
-        //     };
-        //     // Mock Lambda downloadPublish context.done function
-        //     const contextMock = {done: jest.fn()};
-        //     global.console.error = jest.fn();
+        test('downloadPublish', async () => {
+            // Mock Date.prototype.getTime used by getExpiration method
+            const dateGetTimeSpy = jest.spyOn(global.Date.prototype, 'getTime').mockImplementation(() => {
+                return TIME_IN_MS_JAN_1_2018;
+            });
+
+            jest.doMock('../node_modules/lambda-git', () => {
+                return function require() {
+                    return 
+                    {
+                        prop: 'value'
+                    };
+                }
+            });
+
+            shell.runCommand = jest.fn();
+
+            // Mock https get
+            const httpGetSpy = jest.spyOn(https, 'get').mockImplementation((url, callback) => {
+                callback(resp);
+                switch (url) {
+                    case 'https://api.exchangeratesapi.io/latest?base=USD':
+                        resp.data('{');
+                        resp.data('"base":"USD","date":"2018-02-26","rates":{"AUD":1.2752,"BRL":3.2351,"CAD":1.2676,"CHF":0.93588,"CNY":6.3087,"CZK":20.61,"DKK":6.0438,"EUR":0.81169,"GBP":0.71282,"HKD":7.8236,"HUF":254.54,"IDR":13664.0,"ILS":3.493,"INR":64.775,"JPY":106.82,"KRW":1071.6,"MXN":18.602,"MYR":3.9095,"NOK":7.8168,"NZD":1.3675,"PHP":51.896,"PLN":3.3845,"RUB":55.958,"SEK":8.1526,"SGD":1.3171,"THB":31.32,"TRY":3.7808,"ZAR":11.593}');
+                        resp.data('}');
+                        resp.end();
+                        break;
+                    case 'https://api.exchangeratesapi.io/latest?base=GBP':
+                        resp.data('{');
+                        resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
+                        resp.data('}');
+                        resp.end();
+                        break;
+                    default:
+                        resp.error(new Error('Error loading url', url));
+                        break;
+
+                }
+            });
+            // Mock S3.upload callback
+            aws.mocks.s3UploadResult = function successUploadResult(params, callback) {
+                callback(undefined, {
+                    filename: 'latest.json'
+                });
+            };
+            global.console.error = jest.fn();
 
 
-        //     // Integration tests
+            // Integration tests
 
-        //     // check valid responses
-        //     downloadPublish({}, contextMock);
-        //     expect(contextMock.done).toBeCalledWith(null, JSON.stringify({filename: 'latest.json'}));
+            // check valid responses
+            let result = await downloadPublish({}, contextMock);
+            expect(result).toEqual('success');
 
-        //     // check invalid responses
-        //     httpGetSpy.mockReset();
-        //     httpGetSpy.mockImplementation((url, callback) => {
-        //         callback(resp);
-        //         switch (url) {
-        //             case 'https://api.exchangeratesapi.io/latest?base=USD':
-        //                 resp.data('{');
-        //                 resp.data('"base":"USD","date":"2018-02-26","rates":{"TRY":3.7808,"ZAR":11.593}');
-        //                 resp.data('}');
-        //                 resp.end();
-        //                 break;
-        //             case 'https://api.exchangeratesapi.io/latest?base=GBP':
-        //                 resp.data('{');
-        //                 resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
-        //                 resp.data('}');
-        //                 resp.end();
-        //                 break;
-        //             default:
-        //                 resp.error(new Error('Error loading url', url));
-        //                 break;
-        //         }
-        //     });
-        //     contextMock.done.mockReset();
-        //     global.console.error.mockReset();
+            // check invalid responses
+            httpGetSpy.mockReset();
+            httpGetSpy.mockImplementation((url, callback) => {
+                callback(resp);
+                switch (url) {
+                    case 'https://api.exchangeratesapi.io/latest?base=USD':
+                        resp.data('{');
+                        resp.data('"base":"USD","date":"2018-02-26","rates":{"TRY":3.7808,"ZAR":11.593}');
+                        resp.data('}');
+                        resp.end();
+                        break;
+                    case 'https://api.exchangeratesapi.io/latest?base=GBP':
+                        resp.data('{');
+                        resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
+                        resp.data('}');
+                        resp.end();
+                        break;
+                    default:
+                        resp.error(new Error('Error loading url', url));
+                        break;
+                }
+            });
+            contextMock.done.mockReset();
+            global.console.error.mockReset();
 
-        //     downloadPublish({}, contextMock);
-        //     expect(contextMock.done).not.toBeCalled();
-        //     expect(global.console.error).toBeCalledWith("Error: did not receive responses for all fromCurrencies", undefined);
-        //     expect(global.console.error.mock.calls.length).toEqual(2);
-        //     expect(global.console.error.mock.calls[0]).toEqual(["Error: json data failed validation:", {"base": "USD", "date": "2018-02-26", "rates": {"TRY": 3.7808, "ZAR": 11.593}}]);
-        //     expect(global.console.error.mock.calls[1]).toEqual(["Error: did not receive responses for all fromCurrencies", undefined]);
-        //     global.console.error.mockRestore()
-        // });
+            downloadPublish({}, contextMock);
+            expect(contextMock.done).not.toBeCalled();
+            expect(global.console.error).toBeCalledWith("Error: did not receive responses for all fromCurrencies", undefined);
+            expect(global.console.error.mock.calls.length).toEqual(2);
+            expect(global.console.error.mock.calls[0]).toEqual(["Error: json data failed validation:", {"base": "USD", "date": "2018-02-26", "rates": {"TRY": 3.7808, "ZAR": 11.593}}]);
+            expect(global.console.error.mock.calls[1]).toEqual(["Error: did not receive responses for all fromCurrencies", undefined]);
+            global.console.error.mockRestore()
+        });
     });
 
     describe('Unit Tests', () => {
@@ -312,12 +351,14 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
         });
         
         test('purgeCache', async () => {
+            ajax.requestJSONData = jest.fn();
             const response = {"someKey": "someData"};
             ajax.requestJSONData.mockImplementation((url, accept, reject) =>{
                 accept(response);
             });
             await spec.purgeCache('http://purge-url.com', contextMock);
             expect(global.console.log).toBeCalledWith('successfully purged cache', response);
+            ajax.requestJSONData.mockRestore();
         });
     });
 });
