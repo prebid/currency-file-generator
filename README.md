@@ -24,7 +24,7 @@ The github file is hosted at <https://cdn.jsdelivr.net/gh/prebid/currency-file@1
     1. copy app.js to the top level of your local repo dir
     1. the test node_modules aren't needed, so `rm -rd node_modules` and `npm install --production`
     1. zip app.js serverless.yml node_modules to ../currency-gen.zip
-    1. aws s3 cp ../currency-gen.zip s3://currency-file-code
+    1. aws s3 cp ../currency-gen.zip s3://currency-generation-code
     1. go to the AWS lambda UI and upload https://s3.amazonaws.com/currency-generation-code/currency-gen.zip
     1. make sure the environment variables are set correctly
     1. remove app.js from the top level of your local repo dir
