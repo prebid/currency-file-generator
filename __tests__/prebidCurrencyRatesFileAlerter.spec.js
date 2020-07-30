@@ -339,7 +339,9 @@ describe(`Service aws-node-prebid-currency-rates-file-alerter:`, () => {
         test('createSendEmailParams', () => {
             const emailParamsValidationObj = {
                 Destination: {
-                    ToAddresses: expect.stringMatching(emailValidationRegEx),
+                    ToAddresses: expect.arrayContaining([
+                        expect.stringMatching(emailValidationRegEx)
+                    ])
                 },
                 Message: {
                     Subject: {
