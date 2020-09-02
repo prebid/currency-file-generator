@@ -77,14 +77,6 @@ describe('Integration tests', () => {
             return TIME_IN_MS_JAN_1_2018;
         });
 
-        jest.doMock('../node_modules/lambda-git', () => {
-            return function require() {
-                return 
-                {
-                    prop: 'value'
-                };
-            }
-        });
         debugger;
 
 

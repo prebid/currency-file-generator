@@ -19,7 +19,7 @@ service: test-git # NOTE: update this with your service name
 
 provider:
   name: aws
-  runtime: nodejs8.10
+  runtime: nodejs12.x
   environment:
     NODE_ENV: "production"
     LD_LIBRARY_PATH: /usr/lib64:/usr/local/lib

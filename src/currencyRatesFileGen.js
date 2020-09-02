@@ -67,11 +67,9 @@ function incGitTag() {
     }
 }
  
-async function downloadPublish (event, context, callback) {
+async function downloadPublish (event, context) {
     process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
     debugger;
-    // install git binary
-    await require('lambda-git')()
 
     // first try to get the data from the source
 
@@ -126,7 +124,7 @@ function pushToGithub(newDocument) {
     // clone the repository and set it as the cwd
     runCommand(`git clone --quiet https://${gitRepositoryURL}`);
     process.chdir(path.join(process.cwd(), repositoryName))
-    runCommand(`git pull`);
+    runCommand(`git pull --ff-only`);
     // update local file
     fs.writeFileSync('latest.json', JSON.stringify(newDocument));
 

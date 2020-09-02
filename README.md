@@ -23,8 +23,10 @@ The github file is hosted at <https://cdn.jsdelivr.net/gh/prebid/currency-file@1
     1. clone the git repo and make/test your changes locally
     1. copy src/currencyRatesFileGen.js src/ajax.js src/shell.js to the top level of your local repo dir
     1. the test node_modules aren't needed, so `rm -rf node_modules` and `npm install --production`
-    1. zip -r currency-gen.zip currencyRatesFileGen.js serverless.yml node_modules
+    1. zip -r currency-gen.zip currencyRatesFileGen.js ajax.js shell.js serverless.yml node_modules
     1. aws s3 cp currency-gen.zip s3://currency-generation-code
     1. go to the AWS lambda UI and upload https://s3.amazonaws.com/currency-generation-code/currency-gen.zip
+    1. in Basic settings make sure that Handler is set to `currencyRatesFileGen.downloadPublish`
+    1. in AWS lambda UI add a corresponding layer that provides git support from https://github.com/lambci/git-lambda-layer (`arn:aws:lambda:us-east-1:553035198032:layer:git-lambda2:7` as of now)
     1. make sure the environment variables are set correctly
     1. remove currencyRatesFileGen.js, ajax.js, and shell.js from the top level of your local repo dir

@@ -16,8 +16,7 @@
     "node": ">=6.10.3"
   },
   "dependencies": {
-    "aws-sdk": "^2.198.0",
-    "lambda-git": "^0.1.2"
+    "aws-sdk": "^2.198.0"
   },
   "devDependencies": {
     "jest": "^22.4.0"
