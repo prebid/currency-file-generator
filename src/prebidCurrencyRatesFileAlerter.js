@@ -291,7 +291,7 @@ const spec = {
 
         return {
             Destination: {
-                ToAddresses: spec.getAlertTo()
+                ToAddresses: spec.getAlertTo().split(',')
             },
             Message: {
                 Subject: {
