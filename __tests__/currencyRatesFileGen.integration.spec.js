@@ -77,23 +77,53 @@ describe('Integration tests', () => {
             return TIME_IN_MS_JAN_1_2018;
         });
 
-        debugger;
-
-
         // Mock https get
         const httpGetSpy = jest.spyOn(https, 'get').mockImplementation((url, callback) => {
             callback(resp);
             switch (url) {
-                case 'https://api.exchangeratesapi.io/latest?base=USD':
-                    resp.data('{');
-                    resp.data('"base":"USD","date":"2018-02-26","rates":{"AUD":1.2752,"BRL":3.2351,"CAD":1.2676,"CHF":0.93588,"CNY":6.3087,"CZK":20.61,"DKK":6.0438,"EUR":0.81169,"GBP":0.71282,"HKD":7.8236,"HUF":254.54,"IDR":13664.0,"ILS":3.493,"INR":64.775,"JPY":106.82,"KRW":1071.6,"MXN":18.602,"MYR":3.9095,"NOK":7.8168,"NZD":1.3675,"PHP":51.896,"PLN":3.3845,"RUB":55.958,"SEK":8.1526,"SGD":1.3171,"THB":31.32,"TRY":3.7808,"ZAR":11.593}');
-                    resp.data('}');
-                    resp.end();
-                    break;
-                case 'https://api.exchangeratesapi.io/latest?base=GBP':
-                    resp.data('{');
-                    resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
-                    resp.data('}');
+                case "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml":
+                    resp.data('<?xml version="1.0" encoding="UTF-8"?>\n' +
+                        '<gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">\n' +
+                        '    <gesmes:subject>Reference rates</gesmes:subject>\n' +
+                        '    <gesmes:Sender>\n' +
+                        '        <gesmes:name>European Central Bank</gesmes:name>\n' +
+                        '    </gesmes:Sender>\n' +
+                        '    <Cube>\n' +
+                        '        <Cube time=\'2021-04-01\'>\n' +
+                        '            <Cube currency=\'USD\' rate=\'1.1746\'/>\n' +
+                        '            <Cube currency=\'JPY\' rate=\'130.03\'/>\n' +
+                        '            <Cube currency=\'BGN\' rate=\'1.9558\'/>\n' +
+                        '            <Cube currency=\'CZK\' rate=\'26.085\'/>\n' +
+                        '            <Cube currency=\'DKK\' rate=\'7.4379\'/>\n' +
+                        '            <Cube currency=\'GBP\' rate=\'0.85195\'/>\n' +
+                        '            <Cube currency=\'HUF\' rate=\'361.84\'/>\n' +
+                        '            <Cube currency=\'PLN\' rate=\'4.6089\'/>\n' +
+                        '            <Cube currency=\'RON\' rate=\'4.9088\'/>\n' +
+                        '            <Cube currency=\'SEK\' rate=\'10.2753\'/>\n' +
+                        '            <Cube currency=\'CHF\' rate=\'1.1099\'/>\n' +
+                        '            <Cube currency=\'ISK\' rate=\'148.70\'/>\n' +
+                        '            <Cube currency=\'NOK\' rate=\'10.0408\'/>\n' +
+                        '            <Cube currency=\'HRK\' rate=\'7.5705\'/>\n' +
+                        '            <Cube currency=\'RUB\' rate=\'89.5944\'/>\n' +
+                        '            <Cube currency=\'TRY\' rate=\'9.5903\'/>\n' +
+                        '            <Cube currency=\'AUD\' rate=\'1.5500\'/>\n' +
+                        '            <Cube currency=\'BRL\' rate=\'6.6149\'/>\n' +
+                        '            <Cube currency=\'CAD\' rate=\'1.4787\'/>\n' +
+                        '            <Cube currency=\'CNY\' rate=\'7.7195\'/>\n' +
+                        '            <Cube currency=\'HKD\' rate=\'9.1346\'/>\n' +
+                        '            <Cube currency=\'IDR\' rate=\'17068.23\'/>\n' +
+                        '            <Cube currency=\'ILS\' rate=\'3.9150\'/>\n' +
+                        '            <Cube currency=\'INR\' rate=\'86.2275\'/>\n' +
+                        '            <Cube currency=\'KRW\' rate=\'1328.36\'/>\n' +
+                        '            <Cube currency=\'MXN\' rate=\'23.8792\'/>\n' +
+                        '            <Cube currency=\'MYR\' rate=\'4.8693\'/>\n' +
+                        '            <Cube currency=\'NZD\' rate=\'1.6806\'/>\n' +
+                        '            <Cube currency=\'PHP\' rate=\'57.076\'/>\n' +
+                        '            <Cube currency=\'SGD\' rate=\'1.5801\'/>\n' +
+                        '            <Cube currency=\'THB\' rate=\'36.730\'/>\n' +
+                        '            <Cube currency=\'ZAR\' rate=\'17.2074\'/></Cube>\n' +
+                        '    </Cube>\n' +
+                        '</gesmes:Envelope>');
                     resp.end();
                     break;
                 case 'https://purge.jsdelivr.net/gh/prebid/currency-file@1/latest.json':
@@ -116,46 +146,9 @@ describe('Integration tests', () => {
         };
         global.console.error = jest.fn();
 
-
         // Integration tests
-
-        // check valid responses
         let result = await spec.downloadPublish({}, contextMock);
         expect(result).toEqual('success');
-
-        // check invalid responses
-        // httpGetSpy.mockReset();
-        // httpGetSpy.mockImplementation((url, callback) => {
-        //     callback(resp);
-        //     switch (url) {
-        //         case 'https://api.exchangeratesapi.io/latest?base=USD':
-        //             resp.data('{');
-        //             resp.data('"base":"USD","date":"2018-02-26","rates":{"TRY":3.7808,"ZAR":11.593}');
-        //             resp.data('}');
-        //             resp.end();
-        //             break;
-        //         case 'https://api.exchangeratesapi.io/latest?base=GBP':
-        //             resp.data('{');
-        //             resp.data('"base":"GBP","date":"2018-02-26","rates":{"AUD":1.7889,"BRL":4.5385,"CAD":1.7783,"CHF":1.3129,"CNY":8.8503,"CZK":28.913,"DKK":8.4786,"EUR":1.1387,"HKD":10.976,"HUF":357.08,"IDR":19169.0,"ILS":4.9003,"INR":90.871,"JPY":149.85,"KRW":1503.3,"MXN":26.097,"MYR":5.4845,"NOK":10.966,"NZD":1.9184,"PHP":72.803,"PLN":4.748,"RUB":78.501,"SEK":11.437,"SGD":1.8478,"THB":43.938,"TRY":5.3039,"USD":1.4029,"ZAR":16.264}');
-        //             resp.data('}');
-        //             resp.end();
-        //             break;
-        //         default:
-        //             resp.error(new Error('Error loading url', url));
-        //             break;
-        //     }
-        // });
-        // contextMock.done.mockReset();
-        // global.console.error.mockReset();
-
-        // spec.downloadPublish({}, contextMock);
-        // expect(contextMock.done).not.toBeCalled();
-        // expect(global.console.error).toBeCalledWith("Error: did not receive responses for all fromCurrencies", undefined);
-        // expect(global.console.error.mock.calls.length).toEqual(2);
-        // expect(global.console.error.mock.calls[0]).toEqual(["Error: json data failed validation:", {"base": "USD", "date": "2018-02-26", "rates": {"TRY": 3.7808, "ZAR": 11.593}}]);
-        // expect(global.console.error.mock.calls[1]).toEqual(["Error: did not receive responses for all fromCurrencies", undefined]);
-        // global.console.error.mockRestore()
-        //shell.runCommand.mockRestore();
     });
 });
 

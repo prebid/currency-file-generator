@@ -25,8 +25,6 @@ jest.mock('aws-sdk', () => {
     }
 });
 
-
-
 const aws = require('aws-sdk');
 const { spec } = require('../src/currencyRatesFileGen');
 
@@ -56,16 +54,6 @@ describe(`Service aws-node-currency-rates-file-gen: S3 mock for successful opera
 
 
     describe('Unit Tests', () => {
-        test('constructCurrencyUrl', () => {
-            expect(spec.constructCurrencyUrl('USD'))
-                .toEqual('https://api.exchangeratesapi.io/latest?base=USD');
-
-            expect(spec.constructCurrencyUrl()).toBeUndefined();
-
-            expect(spec.constructCurrencyUrl('')).toBeUndefined();
-
-        });
-
         test('createDocument', () => {
             const doc = spec.createDocument([{
                 base: 1.5,

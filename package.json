@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Loads currency rates from api.fixer.io and creates a JSON representation in S3.",
   "scripts": {
-    "test": "jest --coverage \"__tests__/[a-zA-Z_0-9\\-\\.]{1,}spec\\.js$\""
+    "test": "jest --env=node --coverage test"
   },
   "repository": {
     "type": "git",
@@ -13,13 +13,14 @@
   "license": "Apache-2.0",
   "homepage": "https://github.com/prebid/currency-file-generator#readme",
   "engines": {
-    "node": ">=6.10.3"
+    "node": ">=7.6.0"
   },
   "dependencies": {
     "aws-sdk": "^2.198.0"
   },
   "devDependencies": {
-    "jest": "^22.4.0"
+    "jest": "^22.4.0",
+    "xml2json": "^0.12.0"
   },
   "jest": {
     "automock": false,
