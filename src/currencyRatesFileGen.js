@@ -117,9 +117,10 @@ function pushToGithub(newDocument) {
     // now push the file up to git
     // change the cwd to /tmp
     process.chdir('/tmp')
-    // clone the repository and set it as the cwd
-    const randomPrefix = makeid(7);
+    const randomPrefix = getRandomString(7);
+    // adding prefix to make possibility of cloning repository before s3 removes the previous one downloaded
     const nameWithPrefix = `${randomPrefix}_${repositoryName}`
+    // clone the repository and set it as the cwd
     runCommand(`git clone --quiet https://${gitRepositoryURL} ${nameWithPrefix}`);
     process.chdir(path.join(process.cwd(), nameWithPrefix))
     runCommand(`git pull --ff-only`);
@@ -146,11 +147,11 @@ function pushToGithub(newDocument) {
     return (0);
 }
 
-function makeid(length) {
-    var result           = [];
-    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+function getRandomString(length) {
+    var result = [];
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
+    for (var i = 0; i < length; i++) {
         result.push(characters.charAt(Math.floor(Math.random() *
             charactersLength)));
     }
@@ -294,7 +295,8 @@ function createCurrencyResponse(currencyObject, currencyData, currencyDate) {
     currencyData.forEach(data => {
         rate[data.currency] = data.rate / currencyObject.rate;
     })
-    rate["EUR"] = 1/ currencyObject.rate;
+    // Downloaded file contains every currency rate related to EUR, but does not have EUR entry
+    rate["EUR"] = 1 / currencyObject.rate;
     response["rates"] = rate;
     return response;
 }
