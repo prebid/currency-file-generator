@@ -89,7 +89,7 @@ describe('Integration tests', () => {
                         '        <gesmes:name>European Central Bank</gesmes:name>\n' +
                         '    </gesmes:Sender>\n' +
                         '    <Cube>\n' +
-                        '        <Cube time=\'2021-04-01\'>\n' +
+                        '        <Cube time=\'2021-04-07\'>\n' +
                         '            <Cube currency=\'USD\' rate=\'1.1746\'/>\n' +
                         '            <Cube currency=\'JPY\' rate=\'130.03\'/>\n' +
                         '            <Cube currency=\'BGN\' rate=\'1.9558\'/>\n' +

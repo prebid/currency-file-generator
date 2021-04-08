@@ -178,7 +178,8 @@ function createDocument(results) {
         conversions[results[cv].base] = results[cv].rates;
     }
     return {
-        'dataAsOf': new Date().toISOString(),
+        'dataAsOf': new Date(results[0].date),
+        'generatedAt': new Date().toISOString(),
         'conversions': conversions
     };
 }
