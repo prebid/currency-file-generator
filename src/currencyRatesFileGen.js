@@ -8,10 +8,10 @@ const aws = require('aws-sdk');
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
-const { requestJSONData } = require('./ajax.js');
-const { runCommand } = require('./shell.js');
+const {requestJSONData, requestXMLData} = require('./ajax.js');
+const {runCommand} = require('./shell.js');
 
-const { GITHUB_TOKEN, GITHUB_USERNAME, GITHUB_EMAIL } = process.env;
+const {GITHUB_TOKEN, GITHUB_USERNAME, GITHUB_EMAIL} = process.env;
 // leaving this without https:// in order to reuse it when adding the remote
 const gitRepositoryURL = 'github.com/prebid/currency-file.git';
 const repositoryName = 'currency-file';
@@ -37,8 +37,8 @@ function getFilename() {
 }
 
 /**
-* @returns {boolean} env variable value if set or default
-*/
+ * @returns {boolean} env variable value if set or default
+ */
 function getDebug() {
     return (typeof process.env.DEBUG !== 'undefined') ? (process.env.DEBUG === '1') : true;
 }
@@ -46,11 +46,11 @@ function getDebug() {
 
 // gets the current git version and increments the third level
 function incGitTag() {
-    let output = runCommand('git describe --abbrev=0 --tags', { stdio: 'pipe' });
-    if (output && output != "") {
+    let output = runCommand('git describe --abbrev=0 --tags', {stdio: 'pipe'});
+    if (output && output !== "") {
         let versionArray;
         versionArray = output.split(".");
-        if (versionArray.length != 3) {
+        if (versionArray.length !== 3) {
             logError("invalid version: " + version);
         }
         var version3 = parseInt(versionArray[2]);
@@ -66,21 +66,17 @@ function incGitTag() {
         logError("git describe output was invalid");
     }
 }
- 
-async function downloadPublish (event, context) {
+
+async function downloadPublish(event, context) {
     process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
-    debugger;
 
     // first try to get the data from the source
 
     /** @type {Array.<Object>} - loaded and parsed json objects for currency */
-    const urls = [];
-    fromCurrencies.forEach((fromCurrency)=> urls.push(constructCurrencyUrl(fromCurrency)));
     let responses;
-    try{
-        responses = await fetchMultipleUrlsAsPromise(urls);
-    }
-    catch(e){
+    try {
+        responses = await fetchCurrencyResponsesAsPromise();
+    } catch (e) {
         context.fail(e);
         return;
     }
@@ -107,10 +103,10 @@ async function downloadPublish (event, context) {
     // upload json to S3 bucket at key
     console.log('awaiting upload');
     uploadDocumentToS3(docParams, context);
-    
+
     console.log('awaiting purge');
     await purgeCache(PURGE_URL, context);
-    
+
     return "success";
 }
 
@@ -121,9 +117,12 @@ function pushToGithub(newDocument) {
     // now push the file up to git
     // change the cwd to /tmp
     process.chdir('/tmp')
+    const randomPrefix = getRandomString(7);
+    // adding prefix to make possibility of cloning repository before s3 removes the previous one downloaded
+    const nameWithPrefix = `${randomPrefix}_${repositoryName}`
     // clone the repository and set it as the cwd
-    runCommand(`git clone --quiet https://${gitRepositoryURL}`);
-    process.chdir(path.join(process.cwd(), repositoryName))
+    runCommand(`git clone --quiet https://${gitRepositoryURL} ${nameWithPrefix}`);
+    process.chdir(path.join(process.cwd(), nameWithPrefix))
     runCommand(`git pull --ff-only`);
     // update local file
     fs.writeFileSync('latest.json', JSON.stringify(newDocument));
@@ -148,6 +147,16 @@ function pushToGithub(newDocument) {
     return (0);
 }
 
+function getRandomString(length) {
+    var result = [];
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for (var i = 0; i < length; i++) {
+        result.push(characters.charAt(Math.floor(Math.random() *
+            charactersLength)));
+    }
+    return result.join('');
+}
 
 /**
  * @param {number} expires - when to expire for HTTP "Expires:" header (seconds)
@@ -160,18 +169,6 @@ function getExpiration(expires) {
 }
 
 /**
- * @param {string} fromCurrency
- * @returns {string|undefined}
- */
-function constructCurrencyUrl(fromCurrency) {
-    if (typeof fromCurrency !== 'string' || fromCurrency === '') {
-        logError('Error: invalid fromCurrency', fromCurrency + ' ' + Object.prototype.toString.call(fromCurrency));
-        return undefined;
-    }
-    return 'https://api.exchangeratesapi.io/latest?base=' + fromCurrency;
-}
-
-/**
  * @param {Array.<Object>} results
  * @returns {{dataAsOf: string, conversions: {}}}
  */
@@ -181,7 +178,8 @@ function createDocument(results) {
         conversions[results[cv].base] = results[cv].rates;
     }
     return {
-        'dataAsOf': new Date().toISOString(),
+        'dataAsOf': new Date(results[0].date),
+        'generatedAt': new Date().toISOString(),
         'conversions': conversions
     };
 }
@@ -199,7 +197,7 @@ function log(line) {
  */
 function logError(error, context) {
     console.error(error);
-    if(context && typeof context === 'object' && typeof context.fail === 'function' ) {
+    if (context && typeof context === 'object' && typeof context.fail === 'function') {
         context.fail(error);
     }
 }
@@ -233,10 +231,10 @@ function uploadDocumentToS3(params, context) {
     return s3.upload(params, (e, data) => {
         if (e) {
             logError(e.message, context);
-            context.done(null, JSON.stringify({ filename: params.Key, error: data }));
+            context.done(null, JSON.stringify({filename: params.Key, error: data}));
         } else {
             log('rates pushed to s3: ' + params.Bucket + ' ' + params.Key);
-            context.done(null, JSON.stringify({ filename: params.Key }));
+            context.done(null, JSON.stringify({filename: params.Key}));
         }
     });
 }
@@ -251,8 +249,8 @@ function uploadDocumentToS3(params, context) {
 function createDocumentParams(bucket, filename, documentObj, expires) {
     if (typeof bucket === 'string' && bucket !== '' &&
         typeof filename === 'string' && filename !== '' &&
-        documentObj !== null && typeof documentObj === 'object' && !Array.isArray(documentObj) && Object.keys(documentObj).length > 0 &&
-        documentObj !== null && typeof expires === 'object' && expires instanceof Date) {
+        documentObj !== null && typeof documentObj === 'object' && !Array.isArray(documentObj)
+        && Object.keys(documentObj).length > 0 && typeof expires === 'object' && expires instanceof Date) {
         return {
             Bucket: bucket,
             Key: filename,
@@ -262,21 +260,50 @@ function createDocumentParams(bucket, filename, documentObj, expires) {
     }
 }
 
-async function fetchMultipleUrlsAsPromise(fetchUrls){
-    const responses = [];
-    for (let url of fetchUrls) {
-        const promise = new Promise((resolve, reject) => {
-            requestJSONData(url, resolve, reject);
-        });
-        const data = await promise;
-        validateCurrencyData(data);
-        responses.push(data);
+async function fetchCurrencyResponsesAsPromise() {
+    const promise = new Promise((resolve, reject) => {
+        requestXMLData('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml', resolve, reject);
+    });
+    const data = await promise;
+    const currencyData = data["gesmes:Envelope"]["Cube"][0]["Cube"][0];
+    let currencyObjects = normalizeData(currencyData)
+    currencyObjects.forEach(currency => validateCurrencyData(currency))
+
+    return currencyObjects;
+}
+
+function normalizeData(currencyData) {
+    if (!currencyData) {
+        throw new Error(`Error: currency data is not present`);
     }
-    return responses;
+    const currencyRates = currencyData["Cube"];
+    const currencyDate = currencyData["$"]["time"];
+    const currencyObjects = currencyRates.map(data => {
+        return Object.create({
+            currency: data["$"]["currency"],
+            rate: data["$"]["rate"]
+        });
+    })
+    let requestedCurrencies = currencyObjects.filter(curObj => fromCurrencies.includes(curObj.currency));
+    return requestedCurrencies.map(obj => createCurrencyResponse(obj, currencyObjects, currencyDate));
+}
+
+function createCurrencyResponse(currencyObject, currencyData, currencyDate) {
+    let response = Object.create({});
+    response["base"] = currencyObject.currency;
+    response["date"] = currencyDate;
+    let rate = Object.create({});
+    currencyData.forEach(data => {
+        rate[data.currency] = data.rate / currencyObject.rate;
+    })
+    // Downloaded file contains every currency rate related to EUR, but does not have EUR entry
+    rate["EUR"] = 1 / currencyObject.rate;
+    response["rates"] = rate;
+    return response;
 }
 
 function validateCurrencyData(json) {
-    if(!json || typeof json !== 'object') {
+    if (!json || typeof json !== 'object') {
         throw new Error(`Error: json data failed validation`);
     }
     if (!json.base || !json.date || typeof json.rates !== 'object' || Object.keys(json.rates).length < 20) {
@@ -290,10 +317,9 @@ async function purgeCache(url, context) {
         requestJSONData(url, resolve, reject);
     });
     const data = await promise;
-    if(data) {
+    if (data) {
         console.log('successfully purged cache', data);
-    }
-    else{
+    } else {
         logError('error purging cache', context);
     }
 }
@@ -305,7 +331,6 @@ exports.spec = {
     getDebug,
     log,
     logError,
-    constructCurrencyUrl,
     pushToGithub,
     getExpiration,
     createDocument,

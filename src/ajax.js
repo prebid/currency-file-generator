@@ -5,6 +5,42 @@ const https = require('https');
  * @param {function} resolve function to execute in case of success
  * @param {function} reject function to execute in the case of failure
  */
+exports.requestXMLData = function (url, resolve, reject) {
+
+    var https = require('https');
+    var xml2js = require('xml2js');
+    var parser = new xml2js.Parser();
+
+    parser.on('error', function (err) {
+        reject(err);
+    });
+
+    let data = '';
+    return https.get(url, function (res) {
+
+        res.on('data', function (data_) {
+            data += data_.toString();
+        });
+        res.on('error', (e) => {
+            reject(e);
+        });
+        res.on('data', function (data_) {
+            data += data_.toString();
+        });
+        res.on('end', function () {
+            if (data === '') {
+                reject('Error: response body is empty');
+            }
+            parser.parseString(data, function (err, result) {
+                if (err) {
+                    reject(err)
+                }
+                resolve(result)
+            });
+        });
+    });
+}
+
 exports.requestJSONData = function (url, resolve, reject) {
 
     return https.get(url, (res /** @type {https.IncomingMessage} */) => {
