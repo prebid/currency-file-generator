@@ -114,6 +114,10 @@ module.exports.downloadPublish = downloadPublish;
 
 // Based on https://gist.github.com/Loopiezlol/e00c35b0166b4eae891ec6b8d610f83c
 function pushToGithub(newDocument) {
+    
+    if (process.env.SKIP_GITHUB == 1) { 
+        return(0);
+    }
     // now push the file up to git
     // change the cwd to /tmp
     process.chdir('/tmp')
@@ -125,7 +129,7 @@ function pushToGithub(newDocument) {
     process.chdir(path.join(process.cwd(), nameWithPrefix))
     runCommand(`git pull --ff-only`);
     // update local file
-    fs.writeFileSync('latest.json', JSON.stringify(newDocument));
+    fs.writeFileSync(getFilename(), JSON.stringify(newDocument));
 
     // update local git config with email and username (required)
     runCommand(`git config --local user.email ${GITHUB_EMAIL}`)
