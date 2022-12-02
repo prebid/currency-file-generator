@@ -13,7 +13,7 @@
   "license": "Apache-2.0",
   "homepage": "https://github.com/prebid/currency-file-generator#readme",
   "engines": {
-    "node": ">=7.6.0"
+    "node": "^16.13.0"
   },
   "dependencies": {
     "aws-sdk": "^2.198.0"
