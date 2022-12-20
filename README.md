@@ -30,3 +30,5 @@ The github file is hosted at <https://cdn.jsdelivr.net/gh/prebid/currency-file@1
     1. in AWS lambda UI add a corresponding layer that provides git support from https://github.com/lambci/git-lambda-layer (`arn:aws:lambda:us-east-1:553035198032:layer:git-lambda2:7` as of now)
     1. make sure the environment variables are set correctly
     1. remove currencyRatesFileGen.js, ajax.js, and shell.js from the top level of your local repo dir
+
+Note that you'll want to raise the timeout to 1.5 minutes.
