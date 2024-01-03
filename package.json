@@ -16,7 +16,7 @@
     "node": "^16.13.0"
   },
   "dependencies": {
-    "aws-sdk": "^2.198.0"
+    "aws-sdk": "^2.1529.0"
   },
   "devDependencies": {
     "jest": "^29.3.1",
