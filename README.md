@@ -4,31 +4,37 @@ Loads currency rates from a reliable source and creates, uploads a JSON represen
 The S3 file is published to <http://currency.prebid.org/latest.json>.
 The github file is hosted at <https://cdn.jsdelivr.net/gh/prebid/currency-file@1/latest.json>.
 
+### Requirements
+ - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
+ - AWS credentials for account 273354653561
+
 ### Install
-    $ git clone https://github.com/prebid/currency-file-generator.git
-    $ cd currency-file-generator
-    $ npm install
+```bash
+git clone https://github.com/prebid/currency-file-generator.git
+cd currency-file-generator
+(cd generator; npm install)
+```
         
 ### Test
-    $ npm run test
+```bash
+(cd generator; npm test)
+```
 
-#### AWS Lambda Config
-+ `src/currencyRatesFileGen.js` - File
-+ `currencyRatesFilesGen.handler` - Handler
+### Deploy (to beta stack)
 
-## To install in AWS Lambda
-1. Get the login/password from someone who has it
-1. Update lambda function prebidCurrencyRatesFileAlerter from src/prebidCurrencyRatesFileAlerter.js
-1. To update the prebidCurrencyRatesFileGenerator lambda:
-    1. clone the git repo and make/test your changes locally
-    1. copy src/currencyRatesFileGen.js src/ajax.js src/shell.js to the top level of your local repo dir
-    1. the test node_modules aren't needed, so `rm -rf node_modules` and `npm install --production`
-    1. zip -r currency-gen.zip currencyRatesFileGen.js ajax.js shell.js serverless.yml node_modules
-    1. aws s3 cp currency-gen.zip s3://currency-generation-code
-    1. go to the AWS lambda UI and upload https://s3.amazonaws.com/currency-generation-code/currency-gen.zip
-    1. in Basic settings make sure that Handler is set to `currencyRatesFileGen.downloadPublish`
-    1. in AWS lambda UI add a corresponding layer that provides git support from https://github.com/lambci/git-lambda-layer (`arn:aws:lambda:us-east-1:553035198032:layer:git-lambda2:7` as of now)
-    1. make sure the environment variables are set correctly
-    1. remove currencyRatesFileGen.js, ajax.js, and shell.js from the top level of your local repo dir
+```bash
+sam build &&  sam deploy
+```
 
-Note that you'll want to raise the timeout to 1.5 minutes.
+The beta stack updates different files:
+
+ - https://github.com/dgirardi-org/test-currency/blob/master/latest.json (canary checks https://cdn.jsdelivr.net/gh/dgirardi-org/test-currency@1/latest.json)
+ - http://currency-file-generator-beta-testbucket-t9n7w68xdvap.s3-website-us-east-1.amazonaws.com/
+
+### Deploy (to prod)
+
+Once you are satisfifed with your testing in beta, deploy to prod with
+
+```bash
+sam build --config-env prod && sam deploy --config-env prod
+```

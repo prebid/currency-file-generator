@@ -1,0 +1,24 @@
+{
+  "name": "currency-file-generator",
+  "version": "0.0.1",
+  "description": "Loads currency rates from ECB and creates a JSON representation in GH.",
+  "type": "module",
+  "scripts": {
+    "test": "mocha tst/spec/**/*_spec.js"
+  },
+  "author": "Prebid.js Contributors",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/prebid/currency-file-generator",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.633.0",
+    "@aws-sdk/client-secrets-manager": "^3.632.0",
+    "aws-embedded-metrics": "^4.1.1",
+    "octokit": "^4.0.2",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "chai": "^5.1.1",
+    "mocha": "^10.7.3",
+    "sinon": "^18.0.0"
+  }
+}
