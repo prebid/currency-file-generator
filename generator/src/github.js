@@ -85,7 +85,7 @@ export async function githubControls(
         const latest = versions[0];
         versions.forEach((version) => {
             if (compareVersions(version, latest) > 0) {
-                throw new Error(`Unexpected newer version found in older tag: ${major}.${minor}.${patch}`)
+                throw new Error(`Unexpected newer version found in older tag: ${version.join('.')}`)
             }
         })
         return latest;
