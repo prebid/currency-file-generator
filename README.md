@@ -29,11 +29,11 @@ sam build &&  sam deploy
 The beta stack updates different files:
 
  - https://github.com/dgirardi-org/test-currency/blob/master/latest.json (canary checks https://cdn.jsdelivr.net/gh/dgirardi-org/test-currency@1/latest.json)
- - http://currency-file-generator-beta-testbucket-t9n7w68xdvap.s3-website-us-east-1.amazonaws.com/
+ - http://currency-file-generator-beta-testbucket-t9n7w68xdvap.s3-website-us-east-1.amazonaws.com/latest.json
 
 ### Deploy (to prod)
 
-Once you are satisfifed with your testing in beta, deploy to prod with
+Once you are satisfied with your testing in beta, deploy to prod with
 
 ```bash
 sam build --config-env prod && sam deploy --config-env prod
