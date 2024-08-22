@@ -300,7 +300,7 @@ Resources:
       Statistic: Sum
       ComparisonOperator: GreaterThanThreshold
       Threshold: 1
-      TreatMissingData: notBreaching
+      TreatMissingData: ignore
 
   Notifications:
     Type: AWS::SNS::Topic
