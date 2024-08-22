@@ -325,3 +325,123 @@ Resources:
       AlarmActions:
         - !GetAtt Notifications.TopicArn
 
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'currency-file-generator-${Stage}'
+      DashboardBody: !Sub
+        - >
+          {
+            "widgets": [
+              {
+                  "type": "text",
+                  "x": 0,
+                  "y": 0,
+                  "width": 24,
+                  "height": 3,
+                  "properties": {
+                      "markdown": "## Currency file generator (${stage})\n\"Cloudfront\" labels refer to the file at ${cloudfrontFile}\n\n\"Jsdelivr\" labels refer to the file at ${jsdelivrFile}"
+                  }
+              },
+              {
+                "height": 9,
+                "width": 8,
+                "y": 3,
+                "x": 0,
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ { "expression": "m1 / (60 * 60)", "label": "Age (Cloudfront)", "id": "e1" } ],
+                    [ { "expression": "m2 / (60 * 60)", "label": "Age (Jsdelivr)", "id": "e2" } ],
+                    [ "Currency", "Age.Cloudfront", "LogGroup", "${canary}", "ServiceName", "CurrencyCanary", "ServiceType", "AWS::Lambda::Function", { "id": "m1", "visible": false } ],
+                    [ ".", "Age.Jsdelivr", ".", ".", ".", ".", ".", ".", { "id": "m2", "visible": false } ]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "period": 3600,
+                  "region": "us-east-1",
+                  "title": "Age of published currency rates",
+                  "annotations": {
+                    "horizontal": [
+                      {
+                        "label": "Age > 48hrs for 1 datapoints within 1 hour",
+                        "value": 48
+                      }
+                    ]
+                  },
+                  "stat": "Maximum",
+                  "yAxis": {
+                    "left": {
+                      "label": "Hours",
+                      "showUnits": false
+                    }
+                  }
+                }
+              },
+              {
+                "height": 9,
+                "width": 8,
+                "y": 3,
+                "x": 8,
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ "Currency", "Error.Cloudfront", "LogGroup", "${canary}", "ServiceName", "CurrencyCanary", "ServiceType", "AWS::Lambda::Function", { "label": "Validation failure (Cloudfront)", "region": "${region}" } ],
+                    [ ".", "Error.Jsdelivr", ".", ".", ".", ".", ".", ".", { "label": "Validation failure (Jsdelivr)", "region": "${region}" } ]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "period": 3600,
+                  "region": "us-east-1",
+                  "title": "Validation failures on published currency files",
+                  "annotations": {
+                    "horizontal": [
+                      {
+                        "label": "Error > 0 for 1 datapoints within 1 hour",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "stat": "Sum"
+                }
+              },
+              {
+                "height": 9,
+                "width": 8,
+                "y": 3,
+                "x": 16,
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ "AWS/Lambda", "Errors", "FunctionName", "${generator}"]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "period": 120,
+                  "region": "us-east-1",
+                  "title": "Generation failures",
+                  "stat": "Sum",
+                  "annotations": {
+                    "horizontal": [
+                      {
+                        "label": "Errors > 1 for 1 datapoints within 2 minutes",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        - canary: !Ref CanaryFn
+          generator: !Ref GeneratorFn
+          region: !Ref AWS::Region
+          stage: !Ref Stage
+          cloudfrontFile: !Sub
+            - '${cdnUrl}${file}'
+            - cdnUrl: *cdnUrl
+              file: *currencyFile
+          jsdelivrFile: !Sub
+            - 'https://cdn.jsdelivr.net/${jsdelivrPath}${file}'
+            - jsdelivrPath: *jsdelivrPath
+              file: *currencyFile
