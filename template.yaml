@@ -337,15 +337,15 @@ Resources:
                   "type": "text",
                   "x": 0,
                   "y": 0,
-                  "width": 24,
+                  "width": 21,
                   "height": 3,
                   "properties": {
                       "markdown": "## Currency file generator (${stage})\n\"Cloudfront\" labels refer to the file at ${cloudfrontFile}\n\n\"Jsdelivr\" labels refer to the file at ${jsdelivrFile}"
                   }
               },
               {
-                "height": 9,
-                "width": 8,
+                "height": 8,
+                "width": 7,
                 "y": 3,
                 "x": 0,
                 "type": "metric",
@@ -379,10 +379,10 @@ Resources:
                 }
               },
               {
-                "height": 9,
-                "width": 8,
+                "height": 8,
+                "width": 7,
                 "y": 3,
-                "x": 8,
+                "x": 7,
                 "type": "metric",
                 "properties": {
                   "metrics": [
@@ -406,10 +406,10 @@ Resources:
                 }
               },
               {
-                "height": 9,
-                "width": 8,
+                "height": 8,
+                "width": 7,
                 "y": 3,
-                "x": 16,
+                "x": 14,
                 "type": "metric",
                 "properties": {
                   "metrics": [
