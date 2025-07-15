@@ -272,7 +272,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub 'currency-canary-stale-${Stage}'
-      AlarmDescription: !Sub 'Published currency file is older than 48 hours (${Stage})'
+      AlarmDescription: !Sub 'Published currency file is older than 96 hours (${Stage})'
       Period: 3600
       EvaluationPeriods: 1
       Namespace: Currency
@@ -281,7 +281,7 @@ Resources:
       Unit: Seconds
       Statistic: Maximum
       ComparisonOperator: GreaterThanThreshold
-      Threshold: 172800
+      Threshold: 345600
       TreatMissingData: breaching
 
   GenerationFailedAlarm:
@@ -364,8 +364,8 @@ Resources:
                   "annotations": {
                     "horizontal": [
                       {
-                        "label": "Age > 48hrs for 1 datapoints within 1 hour",
-                        "value": 48
+                        "label": "Age > 96hrs for 1 datapoints within 1 hour",
+                        "value": 96
                       }
                     ]
                   },
