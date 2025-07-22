@@ -1,0 +1,447 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Currency file generator
+Parameters:
+  Stage:
+    Type: String
+    Default: 'beta'
+  CurrencyFile:
+    Type: String
+    Default: 'latest.json'
+  CommitterName:
+    Type: String
+    Default: 'prebid-currency-file'
+  CommitterEmail:
+    Type: String
+    Default: 'support@prebid.org'
+
+Mappings:
+  StageParams:
+    beta:
+      repo: 'dgirardi-org/test-currency'
+      jsdelivrPath: 'gh/dgirardi-org/test-currency@1/'
+      cdnUrl: None
+      extBucket: None
+      notify: None
+    prod:
+      repo: 'prebid/currency-file'
+      jsdelivrPath: 'gh/prebid/currency-file@1/'
+      cdnUrl: 'https://currency.prebid.org/'
+      extBucket: currency.prebid.org
+      notify: 'alerts-forward@prebid.org'
+
+Conditions:
+  UseLocalBucket: !Equals
+    - !FindInMap
+      - StageParams
+      - !Ref Stage
+      - extBucket
+    - "None"
+  EmailNotifications: !Not
+    - !Equals
+      - !FindInMap
+        - StageParams
+        - !Ref Stage
+        - notify
+      - "None"
+
+Outputs:
+  GithubSecret:
+    Value: &ghSecret
+      Ref: GithubSecret
+  GithubRepo:
+    Value: &ghRepo
+      Fn::FindInMap:
+        - StageParams
+        - !Ref Stage
+        - repo
+  CommitterName:
+    Value: &committerName
+      Ref: CommitterName
+  CommitterEmail:
+    Value: &committerEmail
+      Ref: CommitterEmail
+  JsdelivrPath:
+    Value: &jsdelivrPath
+      Fn::FindInMap:
+        - StageParams
+        - !Ref Stage
+        - jsdelivrPath
+  CurrencyFile:
+    Value: &currencyFile
+      Ref: CurrencyFile
+  Bucket:
+    Value: &bucket
+      Fn::If:
+        - UseLocalBucket
+        - !Ref TestBucket
+        - !FindInMap
+          - StageParams
+          - !Ref Stage
+          - extBucket
+  CdnUrl:
+    Value: &cdnUrl
+      Fn::If:
+        - UseLocalBucket
+        - !Sub
+          - '${url}/'
+          - url: !GetAtt TestBucket.WebsiteURL
+        - !FindInMap
+          - StageParams
+          - !Ref Stage
+          - cdnUrl
+
+Resources:
+  GithubSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "currency-generator-gh-${Stage}"
+      Description: "Github credentials for updating currency repo"
+
+  TestBucket:
+    Type: AWS::S3::Bucket
+    Condition: UseLocalBucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: 'index.html'
+        ErrorDocument: 'error.html'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  TestBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: UseLocalBucket
+    Properties:
+      Bucket: !Ref TestBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: allowPublicRead
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource:
+              - !Sub
+                - "${arn}/${file}"
+                - arn: !GetAtt TestBucket.Arn
+                  file: *currencyFile
+
+  GeneratorExecRole: &lambdaExecRole
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  GeneratorPermissions:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      RoleName: !Ref GeneratorExecRole
+      PolicyName: generatorPermissions
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: 'readGHSecret'
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource:
+              - !Ref GithubSecret
+          - Sid: 'updateS3Object'
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub
+                - 'arn:aws:s3:::${bucket}/${file}'
+                - bucket: *bucket
+                  file: *currencyFile
+
+  GeneratorFnLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/currency/generator/${Stage}"
+      RetentionInDays: 30
+
+  GeneratorFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'currency-file-generator-${Stage}'
+      Role: !GetAtt GeneratorExecRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      LoggingConfig:
+        LogGroup: !Ref GeneratorFnLogGroup
+      PackageType: Zip
+      CodeUri: ./generator
+      Handler: 'generator.handler'
+      Environment:
+        Variables:
+          GITHUB_REPO: *ghRepo
+          GITHUB_SECRET: *ghSecret
+          GITHUB_NAME: *committerName
+          GITHUB_EMAIL: *committerEmail
+          CURRENCY_FILE: *currencyFile
+          JSDELIVR_PATH: *jsdelivrPath
+          BUCKET: *bucket
+      Events:
+        UpdateDaily:
+          Type: ScheduleV2
+          Properties:
+            Name: !Sub "currency-daily-update-${Stage}"
+            Description: Update currency file after 16 CET
+            ScheduleExpression: 'cron(0 17 * * ? *)'
+            ScheduleExpressionTimezone: CET
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 60
+              MaximumRetryAttempts: 2
+
+  CanaryFnLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/currency/canary/${Stage}"
+      RetentionInDays: 30
+
+  CanaryExecRole: *lambdaExecRole
+
+  CanaryFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'currency-file-canary-${Stage}'
+      Role: !GetAtt CanaryExecRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 3
+      MemorySize: 128
+      LoggingConfig:
+        LogGroup: !Ref CanaryFnLogGroup
+      PackageType: Zip
+      CodeUri: ./generator
+      Handler: 'canary.handler'
+      Environment:
+        Variables:
+          CURRENCY_FILE: *currencyFile
+          JSDELIVR_PATH: *jsdelivrPath
+          CDN_URL: *cdnUrl
+      Events:
+        RunHourly:
+          Type: ScheduleV2
+          Properties:
+            Name: !Sub "currency-canary-${Stage}"
+            Description: Periodically check validity and staleness of currency file
+            ScheduleExpression: 'rate(1 hour)'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 60
+              MaximumRetryAttempts: 2
+
+  InvalidRatesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'currency-canary-error-${Stage}'
+      AlarmDescription: !Sub 'Published currency file is invalid (${Stage})'
+      Period: 3600
+      EvaluationPeriods: 1
+      Namespace: Currency
+      Dimensions: &canaryDims
+        - Name: LogGroup
+          Value: !Ref CanaryFn
+        - Name: ServiceName
+          Value: CurrencyCanary
+        - Name: ServiceType
+          Value: AWS::Lambda::Function
+      MetricName: Error
+      Unit: Count
+      Statistic: Sum
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 0
+      TreatMissingData: breaching
+
+  StaleRatesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'currency-canary-stale-${Stage}'
+      AlarmDescription: !Sub 'Published currency file is older than 96 hours (${Stage})'
+      Period: 3600
+      EvaluationPeriods: 1
+      Namespace: Currency
+      Dimensions: *canaryDims
+      MetricName: Age
+      Unit: Seconds
+      Statistic: Maximum
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 345600
+      TreatMissingData: breaching
+
+  GenerationFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'currency-error-${Stage}'
+      AlarmDescription: !Sub 'Currency file generation failed (${Stage})'
+      Period: 120
+      EvaluationPeriods: 1
+      Namespace: AWS/Lambda
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref GeneratorFn
+      MetricName: Errors
+      Unit: Count
+      Statistic: Sum
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 1
+      TreatMissingData: ignore
+
+  Notifications:
+    Type: AWS::SNS::Topic
+    Condition: EmailNotifications
+    Properties:
+      TopicName: !Sub 'currency-generator-${Stage}'
+      DisplayName: !Sub 'Notifications for currency file generator (${Stage})'
+      Subscription:
+        - Protocol: email
+          Endpoint: !FindInMap
+            - StageParams
+            - !Ref Stage
+            - notify
+
+  CurrencyAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Condition: EmailNotifications
+    Properties:
+      AlarmName: !Sub 'currency-${Stage}'
+      AlarmDescription: !Sub 'Currency file is unhealthy (${Stage})'
+      AlarmRule: !Sub '(ALARM(${InvalidRatesAlarm}) OR ALARM(${StaleRatesAlarm}) OR ALARM(${GenerationFailedAlarm}))'
+      AlarmActions:
+        - !GetAtt Notifications.TopicArn
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'currency-file-generator-${Stage}'
+      DashboardBody: !Sub
+        - >
+          {
+            "widgets": [
+              {
+                  "type": "text",
+                  "x": 0,
+                  "y": 0,
+                  "width": 21,
+                  "height": 3,
+                  "properties": {
+                      "markdown": "## Currency file generator (${stage})\n\"Cloudfront\" labels refer to the file at ${cloudfrontFile}\n\n\"Jsdelivr\" labels refer to the file at ${jsdelivrFile}"
+                  }
+              },
+              {
+                "height": 8,
+                "width": 7,
+                "y": 3,
+                "x": 0,
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ { "expression": "m1 / (60 * 60)", "label": "Age (Cloudfront)", "id": "e1" } ],
+                    [ { "expression": "m2 / (60 * 60)", "label": "Age (Jsdelivr)", "id": "e2" } ],
+                    [ "Currency", "Age.Cloudfront", "LogGroup", "${canary}", "ServiceName", "CurrencyCanary", "ServiceType", "AWS::Lambda::Function", { "id": "m1", "visible": false } ],
+                    [ ".", "Age.Jsdelivr", ".", ".", ".", ".", ".", ".", { "id": "m2", "visible": false } ]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "period": 3600,
+                  "region": "${region}",
+                  "title": "Age of published currency rates",
+                  "annotations": {
+                    "horizontal": [
+                      {
+                        "label": "Age > 96hrs for 1 datapoints within 1 hour",
+                        "value": 96
+                      }
+                    ]
+                  },
+                  "stat": "Maximum",
+                  "yAxis": {
+                    "left": {
+                      "label": "Hours",
+                      "showUnits": false
+                    }
+                  }
+                }
+              },
+              {
+                "height": 8,
+                "width": 7,
+                "y": 3,
+                "x": 7,
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ "Currency", "Error.Cloudfront", "LogGroup", "${canary}", "ServiceName", "CurrencyCanary", "ServiceType", "AWS::Lambda::Function", { "label": "Validation failure (Cloudfront)", "region": "${region}" } ],
+                    [ ".", "Error.Jsdelivr", ".", ".", ".", ".", ".", ".", { "label": "Validation failure (Jsdelivr)", "region": "${region}" } ]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "period": 3600,
+                  "region": "${region}",
+                  "title": "Validation failures on published currency files",
+                  "annotations": {
+                    "horizontal": [
+                      {
+                        "label": "Error > 0 for 1 datapoints within 1 hour",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "stat": "Sum"
+                }
+              },
+              {
+                "height": 8,
+                "width": 7,
+                "y": 3,
+                "x": 14,
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ "AWS/Lambda", "Errors", "FunctionName", "${generator}"]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "period": 120,
+                  "region": "${region}",
+                  "title": "Generation failures",
+                  "stat": "Sum",
+                  "annotations": {
+                    "horizontal": [
+                      {
+                        "label": "Errors > 1 for 1 datapoints within 2 minutes",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        - canary: !Ref CanaryFn
+          generator: !Ref GeneratorFn
+          region: !Ref AWS::Region
+          stage: !Ref Stage
+          cloudfrontFile: !Sub
+            - '${cdnUrl}${file}'
+            - cdnUrl: *cdnUrl
+              file: *currencyFile
+          jsdelivrFile: !Sub
+            - 'https://cdn.jsdelivr.net/${jsdelivrPath}${file}'
+            - jsdelivrPath: *jsdelivrPath
+              file: *currencyFile
